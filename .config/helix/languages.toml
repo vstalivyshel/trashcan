@@ -1,0 +1,9 @@
+[[language]]
+name = "rust"
+auto-format = false
+config = { checkOnSave = { command = "clippy" } }
+
+[[language]]
+name = "lua"
+language-server = { command = "luals" }
+

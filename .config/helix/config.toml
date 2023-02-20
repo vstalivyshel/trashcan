@@ -1,0 +1,51 @@
+theme = "rp" 
+# theme = "kanagawa"
+# theme = "gbl" 
+# theme = "rose_pine_dawn" 
+
+[editor]
+line-number = "relative"
+cursorline = false
+cursorcolumn = false
+auto-format = false
+auto-save = true
+true-color = true
+bufferline = "never"
+color-modes = true
+gutters = ["diagnostics", "diff",  "line-numbers", "spacer", ]
+auto-pairs = true
+auto-completion = true
+auto-info = false
+idle-timeout = 0
+
+[editor.cursor-shape]
+
+insert = "bar"
+select = "block"
+normal = "block"
+
+[editor.statusline]
+left = ["selections", "mode", "file-name", "diagnostics"]
+right = ["position", "spacer", "position-percentage", "spacer", "file-type"]
+separator = " "
+
+[editor.lsp]
+display-messages = true
+auto-signature-help = false
+display-signature-help-docs = false
+
+[keys.select]
+d = ["delete_selection", ":w"]
+
+[keys.normal.space]
+c.r = ":config-reload"
+
+[keys.normal]
+d = ["delete_selection", ":w"]
+i = [":w", "insert_mode"]
+C-g = [":sh pwd"]
+
+[keys.insert]
+C-x = ["completion", "signature_help"]
+esc = [":w", "normal_mode"]
+j = { k = "normal_mode" }
