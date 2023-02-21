@@ -13,4 +13,5 @@ if status is-interactive
     alias up='sudo dnf update -y && rustup update'
     alias dfs="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME"
     alias dfss="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME status"
-nd
+    alias dfsdo='dfs commit -a -m "yea"'
+end
