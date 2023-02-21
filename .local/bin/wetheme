@@ -1,20 +1,22 @@
 #!/bin/env bash
 
-themes=""
+# light
+themes=( "rose-pine-dawn" "Gruvbox light, soft (base16)"  )
+# dark
+themes+=( "rose-pine" "kanagawa (Gogh)" )
 
-themes+="rebecca\n"
-themes+="rose-pine\n"
-themes+="rose-pine-dawn\n"
-themes+="Gruvbox light, soft (base16)\n"
-themes+="kanagawa (Gogh)\n"
+choices=""
+for theme in "${themes[@]}"; do
+  choices+="$theme\n"
+done
 
-selected=$(printf "$themes" | fzf)
+selected_theme=$(printf "$choices" | fzf)
 
-if [[ -z $selected ]]; then
+if [[ -z $selected_theme ]]; then
   exit 0
 fi
 
-color_file=$HOME/.config/wezterm/selected_color.lua
+color_file=$HOME/.config/wezterm/selected_theme.lua
 cat << EOF > "$color_file"
-return "$selected"
+return "$selected_theme"
 EOF

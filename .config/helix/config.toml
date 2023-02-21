@@ -1,7 +1,8 @@
 # theme = "rp" 
 # theme = "kanagawa"
-theme = "gbl" 
+# theme = "gbl" 
 # theme = "rose_pine_dawn" 
+theme = "rose_pine_moon" 
 
 [editor]
 line-number = "relative"

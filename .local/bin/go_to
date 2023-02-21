@@ -1,0 +1,44 @@
+#!/bin/env bash
+
+M=( "helix" "wezterm" "fish" "i3" "i3status" )
+M+=( "HoneyBunny" "Downloads" )
+M+=( "$HOME/.local/bin" )
+
+open_editor_in() {
+	if [[ -d $1 ]]; then
+		cd "$1" || return; $EDITOR
+	else
+		exit 0
+	fi
+}
+
+is_personal() {
+	if [[ $1 =~ [[:upper:]] ]]; then
+		return 0
+	fi
+	return 1
+}
+
+dirs=""
+for m in "${M[@]}"; do
+	if is_personal "$m"; then
+		dirs+="$HOME/$m "
+	elif [[ $m == *"/"* ]]; then
+		dirs+=$m
+	else
+		dirs+="$HOME/.config/$m "
+	fi
+done
+
+selected_dir=$(find $dirs -maxdepth 0 -type d | fzf)
+
+if [[ -z $selected_dir ]]; then
+	exit 0
+fi
+
+if is_personal "$selected_dir"; then
+	open_editor_in "$selected_dir"; $SHELL
+else
+	open_editor_in "$selected_dir"
+fi
+

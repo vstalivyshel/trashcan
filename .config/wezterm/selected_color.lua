@@ -1,1 +1,1 @@
-return "Gruvbox light, soft (base16)"
+return "rose-pine"
