@@ -2,5 +2,6 @@ inherits = "gruvbox_light"
 
 "ui.cursor" = { bg ="fg4", fg = "bg0"}
 "ui.cursor.primary" = { bg = "fg1", fg = "bg0"}
-"ui.selection.primary" = { bg = "bg2" }
-"ui.selection" = { bg = "bg1" }
+"ui.selection.primary" = { bg = "bg3" }
+"ui.selection" = { bg = "bg2" }
+"ui.cursor.match" = {}

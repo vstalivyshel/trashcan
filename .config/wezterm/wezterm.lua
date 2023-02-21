@@ -35,9 +35,9 @@ local function sk(key, mod, action)
 end
 
 -- shortcuts
-sk('c', l, a.SpawnCommandInNewTab { args = {  'fix_cfg' }, })
-sk('f', l, a.SpawnCommandInNewTab { args = {  'go_pers' }, })
-sk('t', l, a.SpawnCommandInNewTab { args = {  'wetheme' }, })
+sk('c', l, a.SpawnCommandInNewTab { args = { 'fix_cfg' }, })
+sk('f', l, a.SpawnCommandInNewTab { args = { 'go_pers' }, })
+sk('t', l, a.SpawnCommandInNewTab { args = { 'wetheme' }, })
 
 -- command palette
 sk('p', l, a.ActivateCommandPalette)

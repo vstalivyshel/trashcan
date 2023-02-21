@@ -1,6 +1,6 @@
-theme = "rp" 
+# theme = "rp" 
 # theme = "kanagawa"
-# theme = "gbl" 
+theme = "gbl" 
 # theme = "rose_pine_dawn" 
 
 [editor]
