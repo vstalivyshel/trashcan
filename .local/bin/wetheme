@@ -16,7 +16,7 @@ if [[ -z $selected_theme ]]; then
   exit 0
 fi
 
-color_file=$HOME/.config/wezterm/selected_theme.lua
+color_file=$HOME/.config/wezterm/color_file.lua
 cat << EOF > "$color_file"
 return "$selected_theme"
 EOF

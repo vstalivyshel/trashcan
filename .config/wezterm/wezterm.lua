@@ -3,7 +3,7 @@ local a = wt.action
 local l = 'LEADER'
 
 local O = {
-  color_scheme = require("selected_color"),
+  color_scheme = require("color_file"),
   harfbuzz_features = { "calt=0", "clig=0", "liga=0" },
   automatically_reload_config = true,
   hide_mouse_cursor_when_typing = true,
