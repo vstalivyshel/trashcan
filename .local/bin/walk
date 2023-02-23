@@ -1,0 +1,71 @@
+#!/bin/env bash
+
+# Use exa if available (more options)
+if command -v exa &> /dev/null; then
+  list_items_command='exa -a --git --color=always --group-directories-first'
+else
+  list_items_command='ls --a --color=always'
+fi 
+
+
+# Use bat if available (syntax highlightning)
+if command -v bat &> /dev/null; then
+  preview_command="bat --color always --decorations never --theme ansi"
+else
+  preview_command='cat'
+fi
+# Some changes in the preview function 
+# if the default $SHELL is the fish
+if [[ $SHELL == *"fish"* ]]; then
+  preview_function="
+    if test -d {}
+        $list_items_command -l {}
+    else
+        $preview_command {}
+    end
+  "
+else
+  preview_function="
+    if [[ -d {} ]]; then
+      $list_items_command -l {}
+    else
+      $preview_command {}
+    fi
+  "
+fi
+
+list_items() {
+  $list_items_command | IFL='\n' fzf \
+    --ansi --cycle \
+    --bind 'ctrl-b:preview-half-page-up'\
+    --bind 'ctrl-f:preview-half-page-down'\
+    --preview "$preview_function"
+    
+}
+
+# Why not
+specified() {
+  if [[ -n $1 ]] && [[ -d $1 ]]; then
+    return 0
+  fi
+  return 1
+}
+
+open_selected() {
+  if [[ $1 == '.' ]]; then
+    $SHELL
+  elif [[ -z $1 ]]; then
+    exit 0
+  elif [[ -d $1 ]]; then
+    builtin cd "$1" || return
+  elif [[ -f $1 ]]; then
+    $EDITOR "$1"
+  fi
+}
+
+# Main loop
+while true
+do
+  item=$(list_items)
+  open_selected "$item"
+done

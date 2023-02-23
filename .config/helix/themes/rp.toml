@@ -3,3 +3,9 @@ inherits = "rose_pine"
 "keyword.operator" = "text"
 "punctuation" = "text"
 "operator" = "text"
+
+"diagnostic" = {}
+"diagnostic.hint" = {}
+"diagnostic.info" = {}
+"diagnostic.warning" = {}
+"diagnostic.error" = {}

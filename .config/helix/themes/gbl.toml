@@ -5,3 +5,9 @@ inherits = "gruvbox_light"
 "ui.selection.primary" = { bg = "bg3" }
 "ui.selection" = { bg = "bg2" }
 "ui.cursor.match" = {}
+
+"diagnostic" = {}
+"diagnostic.hint" = {}
+"diagnostic.info" = {}
+"diagnostic.warning" = {}
+"diagnostic.error" = {}

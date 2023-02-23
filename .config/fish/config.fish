@@ -1,13 +1,15 @@
 if status is-interactive
     fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin
 
-    set -Ux EDITOR $HOME/.cargo/bin/hx    
+    set -Ux EDITOR /bin/kak
     set -Ux VISUAL $EDITOR
 
-    bind \cv hx
+    bind \cv kak
     bind \cl 'ls -Ahls; commandline -f repaint'
+    bind \ew walk
     setxkbmap -option "ctrl:nocaps"
 
+    set -g FZF_DEFAULT_COMMAND fd --hidden
     set -g PYTHONDONTWRITEBYTECODE 1
 
     alias up='sudo dnf update -y && rustup update'

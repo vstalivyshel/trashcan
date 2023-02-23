@@ -37,6 +37,7 @@ end
 -- shortcuts
 sk('f', l, a.SpawnCommandInNewTab { args = { 'go_to' }, })
 sk('t', l, a.SpawnCommandInNewTab { args = { 'wetheme' }, })
+sk('e', l, a.SpawnCommandInNewTab { args = { 'walk', "/home/vstalivyshel" }, })
 
 -- command palette
 sk('p', l, a.ActivateCommandPalette)

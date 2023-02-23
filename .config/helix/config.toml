@@ -1,10 +1,10 @@
 # theme = "rp" 
-# theme = "kanagawa"
-# theme = "gbl" 
-# theme = "rose_pine_dawn" 
-theme = "rose_pine_moon" 
+# theme = "kana"
+theme = "gbl" 
+# theme = "rpm"
 
 [editor]
+scrolloff = 15
 line-number = "relative"
 cursorline = false
 cursorcolumn = false
@@ -13,7 +13,7 @@ auto-save = true
 true-color = true
 bufferline = "never"
 color-modes = true
-gutters = ["diagnostics", "diff",  "line-numbers", "spacer", ]
+gutters = [ "diff",  "line-numbers", "spacer", ]
 auto-pairs = true
 auto-completion = true
 auto-info = false
@@ -21,7 +21,7 @@ idle-timeout = 0
 
 [editor.cursor-shape]
 
-insert = "bar"
+insert = "block"
 select = "block"
 normal = "block"
 
