@@ -1,4 +1,30 @@
-colorscheme gruvbox-light
+set-option global startup_info_version 999999999
 
-eval %sh{kak-lsp --kakoune -s $kak_session}
-lsp-enable
+colorscheme rose-pine
+#colorscheme gruvbox-light
+
+hook global WinSetOption '.*' %{ remove-hooks window '.*-insert' }
+
+evaluate-commands %sh{kak-lsp --kakoune -s $kak_session} 
+hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
+    lsp-enable-window
+}
+declare-option -hidden str modeline_progress ""
+define-command -hidden -params 6 -override lsp-handle-progress %{
+    set global modeline_progress %sh{
+        if ! "$6"; then
+            echo "$2${5:+" ($5%)"}${4:+": $4"}"
+        fi
+    }
+}
+
+add-highlighter -override global/ number-lines -relative -hlcursor -separator \  
+set-option global ui_options terminal_assistant=none
+set-option global tabstop 4
+set-option global scrolloff 15,0
+set-option global modelinefmt "%opt{modeline_progress} %opt{modelinefmt} | %sh{date '+%A %D %T'}" 
+
+hook global KakBegin .* %{
+    source ~/.config/kak/def.kak
+    source ~/.config/kak/map.kak 
+}

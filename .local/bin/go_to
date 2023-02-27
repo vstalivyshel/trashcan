@@ -4,19 +4,31 @@ M=( "helix" "wezterm" "fish" "i3" "i3status" "kak" )
 M+=( "HoneyBunny" "Downloads" )
 M+=( "$HOME/.local/bin" )
 
-open_editor() {
-	if [[ -d $1 ]]; then
-  	cd "$1" || return; $EDITOR
-	else
-		exit 0
-	fi
-}
-
 is_personal() {
 	if [[ $1 =~ [[:upper:]] ]]; then
 		return 0
 	fi
 	return 1
+}
+
+kak_connect() {
+    kak -clear
+    local server_name
+    server_name=$(basename $PWD)
+    if [[ -z $(kak -l | grep "$server_name") ]]; then
+        setsid kak -d -s "$server_name" &
+        sleep 0,05
+    fi
+    kak -c "$server_name"
+}
+
+open_editor() {
+    test -d "$1"; builtin cd "$1" || return
+    if [[ "$EDITOR" == 'kak' ]]; then
+        kak_connect
+    else
+     	$EDITOR
+	fi
 }
 
 dirs=""
@@ -31,14 +43,4 @@ for m in "${M[@]}"; do
 done
 
 selected_dir=$(find $dirs -maxdepth 1 -type d | fzf)
-
-if [[ -z $selected_dir ]]; then
-	exit 0
-fi
-
-if is_personal "$selected_dir"; then
-	open_editor "$selected_dir" && $SHELL
-else
-	open_editor "$selected_dir"
-fi
-
+open_editor "$selected_dir"

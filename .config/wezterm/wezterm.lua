@@ -1,8 +1,8 @@
 local wt = require "wezterm"
 local a = wt.action
 local l = 'LEADER'
-
-local O = {
+local M = {
+  tab_max_width = 25,
   color_scheme = require("color_file"),
   harfbuzz_features = { "calt=0", "clig=0", "liga=0" },
   automatically_reload_config = true,
@@ -22,56 +22,56 @@ local O = {
   disable_default_key_bindings = true,
 }
 
-O.keys = {}
-O.key_tables = {}
-O.leader = { key = 'q', mods = 'CTRL' }
+M.keys = {}
+M.key_tables = {}
+M.leader = { key = 'q', mods = 'CTRL' }
 
-local function sk(key, mod, action)
-  table.insert(O.keys, {
-    key = key,
-    mods = mod,
-    action = action
+local function map(key, mod, action)
+  table.insert(M.keys, {
+      key = key,
+      mods = mod,
+      action = action
   })
 end
 
 -- shortcuts
-sk('f', l, a.SpawnCommandInNewTab { args = { 'go_to' }, })
-sk('t', l, a.SpawnCommandInNewTab { args = { 'wetheme' }, })
-sk('e', l, a.SpawnCommandInNewTab { args = { 'walk', "/home/vstalivyshel" }, })
+map('f', l, a.SpawnCommandInNewTab { args = { 'go_to' }, })
+map('t', l, a.SpawnCommandInNewTab { args = { 'wetheme' }, })
+map('e', l, a.SpawnCommandInNewTab { args = { 'walk', "/home/vstalivyshel" }, })
 
 -- command palette
-sk('p', l, a.ActivateCommandPalette)
+map('p', l, a.ActivateCommandPalette)
 
 -- copy paste
-sk('C', 'CTRL', a.CopyTo 'Clipboard')
-sk('V', 'CTRL', a.PasteFrom 'Clipboard')
+map('C', 'CTRL', a.CopyTo 'Clipboard')
+map('V', 'CTRL', a.PasteFrom 'Clipboard')
 
 -- font size
-sk('0', 'CTRL', a.ResetFontSize)
-sk('=', 'CTRL', a.IncreaseFontSize)
-sk('-', 'CTRL', a.DecreaseFontSize)
+map('0', 'CTRL', a.ResetFontSize)
+map('=', 'CTRL', a.IncreaseFontSize)
+map('-', 'CTRL', a.DecreaseFontSize)
 
 -- splits
-sk('s', l, a.SplitVertical { domain = 'CurrentPaneDomain' })
-sk('v', l, a.SplitHorizontal { domain = 'CurrentPaneDomain' })
-sk('j', 'ALT', a.ActivatePaneDirection 'Down')
-sk('k', 'ALT', a.ActivatePaneDirection 'Up')
-sk('l', 'ALT', a.ActivatePaneDirection 'Right')
-sk('h', 'ALT', a.ActivatePaneDirection 'Left')
-sk('r', l, a.ActivateKeyTable { name = 'resize_pane', one_shot = false })
+map('s', l, a.SplitVertical { domain = 'CurrentPaneDomain' })
+map('v', l, a.SplitHorizontal { domain = 'CurrentPaneDomain' })
+map('r', l, a.ActivateKeyTable { name = 'resize_pane', one_shot = false })
+map('j', 'CTRL|SHIFT', a.ActivatePaneDirection 'Down')
+map('k', 'CTRL|SHIFT', a.ActivatePaneDirection 'Up')
+map('l', 'CTRL|SHIFT', a.ActivatePaneDirection 'Right')
+map('h', 'CTRL|SHIFT', a.ActivatePaneDirection 'Left')
 
 -- tabs
-sk('w', l, a.SpawnTab 'CurrentPaneDomain')
-sk('0', 'ALT', a.ActivateTabRelative(1))
-sk('9', 'ALT', a.ActivateTabRelative( -1))
+map('w', l, a.SpawnTab 'CurrentPaneDomain')
+map('0', 'ALT', a.ActivateTabRelative(1))
+map('9', 'ALT', a.ActivateTabRelative( -1))
 for i = 1, 8 do
-  sk('F' .. tostring(i), '', a.ActivateTab(i - 1))
-  sk(tostring(i), 'ALT', a.ActivateTab(i - 1))
+  map('F' .. tostring(i), '', a.ActivateTab(i - 1))
+  map(tostring(i), 'ALT', a.ActivateTab(i - 1))
 end
 
 -- copy mode
 local cm = {}
-sk('Space', l, a.ActivateCopyMode)
+map('Space', l, a.ActivateCopyMode)
 local copy_mode = wt.gui.default_key_tables().copy_mode
 for _, key in pairs(cm) do
   table.insert(copy_mode, key)
@@ -83,13 +83,13 @@ local resize_mode = {
   { key = 'l', action = a.AdjustPaneSize { 'Right', 5 } },
   { key = 'k', action = a.AdjustPaneSize { 'Up', 5 } },
   { key = 'j', action = a.AdjustPaneSize { 'Down', 5 } },
-  { key = 'c', mods = 'CTRL',                           action = 'PopKeyTable' },
+  { key = 'c', mods = 'CTRL', action = 'PopKeyTable' },
 }
 
 -- modes
-O.key_tables = {
+M.key_tables = {
   resize_pane = resize_mode,
   copy_mode = copy_mode,
 }
 
-return O
+return M

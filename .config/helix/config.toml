@@ -49,4 +49,4 @@ C-g = [":sh pwd"]
 [keys.insert]
 C-x = ["completion", "signature_help"]
 esc = [":w", "normal_mode"]
-j = { k = "normal_mode" }
+k = { j = "normal_mode" }

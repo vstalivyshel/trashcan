@@ -4,7 +4,7 @@
 if command -v exa &> /dev/null; then
   list_items_command='exa -a --git --color=always --group-directories-first'
 else
-  list_items_command='ls --a --color=always'
+  list_items_command='ls --A --color=always'
 fi 
 
 
@@ -34,34 +34,46 @@ else
   "
 fi
 
+# Some Control Flow
+quit="execute(echo 'QUIT_WALKING')+abort"
+stop="execute(echo 'STOP_MOVING')+abort"
+
+analyze_selected() {
+  case "$1" in
+    'QUIT_WALKING') # Quit a loop
+      exit 0 ;;
+    'STOP_MOVING')  # Exit the FZF and run a shell without leaving a loop
+      $SHELL ;;
+    *) 
+      return ;;
+  esac
+}
+
+open_selected() {
+  if [[ -d $1 ]]; then
+    builtin cd "$1" || return
+  elif [[ -f $1 ]]; then
+    $EDITOR "$1"
+  else
+    analyze_selected "$1"
+  fi
+}
+
 list_items() {
-  $list_items_command | IFL='\n' fzf \
+  $list_items_command | fzf \
     --ansi --cycle \
-    --bind 'ctrl-b:preview-half-page-up'\
-    --bind 'ctrl-f:preview-half-page-down'\
+    --bind "ctrl-b:preview-half-page-up"\
+    --bind "ctrl-f:preview-half-page-down"\
+    --bind "ctrl-h:execute(echo ..)+abort"\
+    --bind "ctrl-l:accept"\
+    --bind "ctrl-c:$quit"\
+    --bind "esc:$stop"\
+    --preview-window=70%\
     --preview "$preview_function"
     
 }
 
-# Why not
-specified() {
-  if [[ -n $1 ]] && [[ -d $1 ]]; then
-    return 0
-  fi
-  return 1
-}
-
-open_selected() {
-  if [[ $1 == '.' ]]; then
-    $SHELL
-  elif [[ -z $1 ]]; then
-    exit 0
-  elif [[ -d $1 ]]; then
-    builtin cd "$1" || return
-  elif [[ -f $1 ]]; then
-    $EDITOR "$1"
-  fi
-}
+test -d "$1"; builtin cd "$1" || return
 
 # Main loop
 while true
