@@ -59,14 +59,12 @@ define-command find-buffer \
 define-command ls \
 	-docstring 'List files in the current directory' \
 	-override \
-	%{ info -title %val{client_env_PWD} %sh{ ls -Alh } }
+	%{ info -title "%val{client_env_PWD}/" %sh{ ls -Alh } }
 
 define-command pwd \
 	-docstring 'Echo the current working directory' \
 	-override \
-	%{ info %sh{
-    	echo "$kak_buffile"
-	} }
+	%{ info %sh{ echo "$kak_buffile" } }
 
 define-command sh \
 	-override \
