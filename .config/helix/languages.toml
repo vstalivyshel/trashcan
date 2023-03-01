@@ -1,9 +1,0 @@
-[[language]]
-name = "rust"
-[language.config]
-config = { checkOnSave = { command = "clippy" } }
-
-[[language]]
-name = "lua"
-language-server = { command = "luals" }
-

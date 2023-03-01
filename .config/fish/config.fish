@@ -1,5 +1,5 @@
 if status is-interactive
-    fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin
+    fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin $HOME/.local/scr
 
     set -Ux EDITOR kak
     set -Ux VISUAL $EDITOR

@@ -1,21 +1,17 @@
 #!/bin/env bash
 
-# Use exa if available (more options)
 if command -v exa &> /dev/null; then
   list_items_command='exa -a --git --color=always --group-directories-first'
 else
   list_items_command='ls --A --color=always'
 fi 
 
-
-# Use bat if available (syntax highlightning)
 if command -v bat &> /dev/null; then
   preview_command="bat --color always --decorations never --theme ansi"
 else
   preview_command='cat'
 fi
-# Some changes in the preview function 
-# if the default $SHELL is the fish
+
 if [[ $SHELL == *"fish"* ]]; then
   preview_function="
     if test -d {}
@@ -34,28 +30,14 @@ else
   "
 fi
 
-# Some Control Flow
-quit="execute(echo 'QUIT_WALKING')+abort"
-stop="execute(echo 'STOP_MOVING')+abort"
-
-analyze_selected() {
-  case "$1" in
-    'QUIT_WALKING') # Quit a loop
-      exit 0 ;;
-    'STOP_MOVING')  # Exit the FZF and run a shell without leaving a loop
-      $SHELL ;;
-    *) 
-      return ;;
-  esac
-}
-
 open_selected() {
   if [[ -d $1 ]]; then
     builtin cd "$1" || return
   elif [[ -f $1 ]]; then
     $EDITOR "$1"
-  else
-    analyze_selected "$1"
+  elif [[ -z $1 ]]; then
+    $SHELL
+	exit 0
   fi
 }
 
@@ -66,8 +48,6 @@ list_items() {
     --bind "ctrl-f:preview-half-page-down"\
     --bind "ctrl-h:execute(echo ..)+abort"\
     --bind "ctrl-l:accept"\
-    --bind "ctrl-c:$quit"\
-    --bind "esc:$stop"\
     --preview-window=70%\
     --preview "$preview_function"
     
@@ -75,7 +55,6 @@ list_items() {
 
 test -d "$1"; builtin cd "$1" || return
 
-# Main loop
 while true
 do
   item=$(list_items)

@@ -1,0 +1,11 @@
+#!/bin/env bash
+
+command=$*
+
+readarray -t list_sessions < <(kak -l)
+
+for ses in "${list_sessions[@]}"; do
+    echo "$command" | kak -p "$ses"
+    echo "$command"
+done
+

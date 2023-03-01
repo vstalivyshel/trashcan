@@ -1,8 +1,8 @@
 #!/bin/env bash
 
-M=( "helix" "wezterm" "fish" "i3" "i3status" "kak" )
+M=( "wezterm" "fish" "i3" "i3status" "kak" )
 M+=( "HoneyBunny" "Downloads" )
-M+=( "$HOME/.local/bin" )
+M+=( "$HOME/.local/scr" )
 
 is_personal() {
 	if [[ $1 =~ [[:upper:]] ]]; then
@@ -17,12 +17,15 @@ kak_connect() {
     server_name=$(basename $PWD)
     if [[ -z $(kak -l | grep "$server_name") ]]; then
         setsid kak -d -s "$server_name" &
-        sleep 0,05
+        sleep 0.05
     fi
     kak -c "$server_name"
 }
 
 open_editor() {
+    if [[ -z $1 ]]; then
+        exit 0
+    fi
     test -d "$1"; builtin cd "$1" || return
     if [[ "$EDITOR" == 'kak' ]]; then
         kak_connect
