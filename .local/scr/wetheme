@@ -3,7 +3,9 @@
 # light
 themes=( "rose-pine-dawn" "Gruvbox light, soft (base16)"  )
 # dark
-themes+=( "rose-pine" "kanagawa (Gogh)" )
+themes+=( "rose-pine-moon" "rose-pine" "kanagawa (Gogh)" )
+# kakoune
+# themes_kak=( "gruv-light" "rose-pine-moon" "rose-pine-dawn" "rose-pine" "kanagawa" )
 
 choices=""
 for theme in "${themes[@]}"; do
@@ -16,7 +18,18 @@ if [[ -z $selected_theme ]]; then
   exit 0
 fi
 
+kak_theme=
+case "$selected_theme" in
+    *"Gruvbox"*) kak_theme="gruv-light"
+        ;;
+    *"kanagawa"*) kak_theme="kanagawa"
+        ;;
+    *) kak_theme="$selected_theme"
+esac
+
 color_file=$HOME/.config/wezterm/color_file.lua
 cat << EOF > "$color_file"
 return "$selected_theme"
 EOF
+
+katalk "colorscheme $kak_theme"

@@ -1,11 +1,11 @@
 #!/bin/env bash
 
-command=$*
+# To be improved..
+
+set -- "$@"
 
 readarray -t list_sessions < <(kak -l)
 
 for ses in "${list_sessions[@]}"; do
-    echo "$command" | kak -p "$ses"
-    echo "$command"
+    echo "$@" | kak -p "$ses"
 done
-

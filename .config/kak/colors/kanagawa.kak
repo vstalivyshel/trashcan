@@ -2,44 +2,44 @@
 # And to https://github.com/catppuccin/kakoune
 # And to https://github.com/rebelot/kanagawa.nvim
 
-declare-option str seaFoam                 "rgb:C7CCD1" # custom lighter foreground
-declare-option str fujiWhite               "rgb:DCD7BA" # default foreground
-declare-option str oldWhite                "rgb:C8C093" # dark foreground, e.g. statuslines
-declare-option str sumiInk0                "rgb:16161D" # dark background, e.g. statuslines, floating windows
-declare-option str sumiInk1                "rgb:1F1F28" # default background
-declare-option str sumiInk2                "rgb:2A2A37" # lighter background, e.g. colorcolumns, folds
-declare-option str sumiInk3                "rgb:363646" # lighter background, e.g. cursorline
-declare-option str sumiInk4                "rgb:54546D" # darker foreground, e.g. linenumbers, fold column
-declare-option str waveBlue1               "rgb:223249" # popup background, visual selection background
-declare-option str waveBlue2               "rgb:2D4F67" # popup selection background, search background
-declare-option str winterGreen             "rgb:2B3328" # diff add background
-declare-option str winterYellow            "rgb:49443C" # diff change background
-declare-option str winterRed               "rgb:43242B" # diff deleted background
-declare-option str winterBlue              "rgb:252535" # diff line background
-declare-option str autumnGreen             "rgb:76946A" # git add
-declare-option str autumnRed               "rgb:C34043" # git delete
-declare-option str autumnYellow            "rgb:DCA561" # git change
-declare-option str samuraiRed              "rgb:E82424" # diagnostic error
-declare-option str roninYellow             "rgb:FF9E3B" # diagnostic warning
-declare-option str waveAqua1               "rgb:6A9589" # diagnostic info
-declare-option str dragonBlue              "rgb:658594" # diagnostic hint
-declare-option str fujiGray                "rgb:727169" # comments
-declare-option str springViolet1           "rgb:938AA9" # light foreground
-declare-option str oniViolet               "rgb:957FB8" # statements and keywords
-declare-option str crystalBlue             "rgb:7E9CD8" # functions and titles
-declare-option str springViolet2           "rgb:9CABCA" # brackets and punctuation
-declare-option str springBlue              "rgb:7FB4CA" # specials and builtins
-declare-option str lightBlue               "rgb:A3D4D5" # not used!
-declare-option str waveAqua2               "rgb:7AA89F" # types
-declare-option str springGreen             "rgb:98BB6C" # strings
-declare-option str boatYellow1             "rgb:938056" # not used
-declare-option str boatYellow2             "rgb:C0A36E" # operators, regex
-declare-option str carpYellow              "rgb:E6C384" # identifiers
-declare-option str sakuraPink              "rgb:D27E99" # numbers
-declare-option str waveRed                 "rgb:E46876" # standout specials 1, e.g. builtin variables
-declare-option str peachRed                "rgb:FF5D62" # standout specials 2, e.g. exception handling, returns
-declare-option str surimiOrange            "rgb:FFA066" # constants, imports, booleans
-declare-option str katanaGray              "rgb:717C7C" # deprecated
+declare-option -hidden str seaFoam                 "rgb:C7CCD1" # custom lighter foreground
+declare-option -hidden str fujiWhite               "rgb:DCD7BA" # default foreground
+declare-option -hidden str oldWhite                "rgb:C8C093" # dark foreground, e.g. statuslines
+declare-option -hidden str sumiInk0                "rgb:16161D" # dark background, e.g. statuslines, floating windows
+declare-option -hidden str sumiInk1                "rgb:1F1F28" # default background
+declare-option -hidden str sumiInk2                "rgb:2A2A37" # lighter background, e.g. colorcolumns, folds
+declare-option -hidden str sumiInk3                "rgb:363646" # lighter background, e.g. cursorline
+declare-option -hidden str sumiInk4                "rgb:54546D" # darker foreground, e.g. linenumbers, fold column
+declare-option -hidden str waveBlue1               "rgb:223249" # popup background, visual selection background
+declare-option -hidden str waveBlue2               "rgb:2D4F67" # popup selection background, search background
+declare-option -hidden str winterGreen             "rgb:2B3328" # diff add background
+declare-option -hidden str winterYellow            "rgb:49443C" # diff change background
+declare-option -hidden str winterRed               "rgb:43242B" # diff deleted background
+declare-option -hidden str winterBlue              "rgb:252535" # diff line background
+declare-option -hidden str autumnGreen             "rgb:76946A" # git add
+declare-option -hidden str autumnRed               "rgb:C34043" # git delete
+declare-option -hidden str autumnYellow            "rgb:DCA561" # git change
+declare-option -hidden str samuraiRed              "rgb:E82424" # diagnostic error
+declare-option -hidden str roninYellow             "rgb:FF9E3B" # diagnostic warning
+declare-option -hidden str waveAqua1               "rgb:6A9589" # diagnostic info
+declare-option -hidden str dragonBlue              "rgb:658594" # diagnostic hint
+declare-option -hidden str fujiGray                "rgb:727169" # comments
+declare-option -hidden str springViolet1           "rgb:938AA9" # light foreground
+declare-option -hidden str oniViolet               "rgb:957FB8" # statements and keywords
+declare-option -hidden str crystalBlue             "rgb:7E9CD8" # functions and titles
+declare-option -hidden str springViolet2           "rgb:9CABCA" # brackets and punctuation
+declare-option -hidden str springBlue              "rgb:7FB4CA" # specials and builtins
+declare-option -hidden str lightBlue               "rgb:A3D4D5" # not used!
+declare-option -hidden str waveAqua2               "rgb:7AA89F" # types
+declare-option -hidden str springGreen             "rgb:98BB6C" # strings
+declare-option -hidden str boatYellow1             "rgb:938056" # not used
+declare-option -hidden str boatYellow2             "rgb:C0A36E" # operators, regex
+declare-option -hidden str carpYellow              "rgb:E6C384" # identifiers
+declare-option -hidden str sakuraPink              "rgb:D27E99" # numbers
+declare-option -hidden str waveRed                 "rgb:E46876" # standout specials 1, e.g. builtin variables
+declare-option -hidden str peachRed                "rgb:FF5D62" # standout specials 2, e.g. exception handling, returns
+declare-option -hidden str surimiOrange            "rgb:FFA066" # constants, imports, booleans
+declare-option -hidden str katanaGray              "rgb:717C7C" # deprecated
 
 # Markup
 set-face	global	title				   "%opt{springViolet2}"

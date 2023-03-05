@@ -1,15 +1,241 @@
-colorscheme gruv-light
+#------------------------------------------------------------------------------
+# colorscheme gruv-light
+# colorscheme rose-pine-dawn
+# colorscheme kanagawa
 add-highlighter -override global/ number-lines -relative -hlcursor -separator \    
-
 set-option global ui_options terminal_assistant=none
 set-option global tabstop 4
 set-option global scrolloff 15,0
 set-option global startup_info_version 999999999
-hook global WinSetOption '.*' %{ remove-hooks window '.*-insert' }
+set-option global disabled_hooks '.*-insert'
+# source ~/.config/kak/pykak/pykak.kak
 
-hook global KakBegin .* %{
-    source ~/.config/kak/lsp.kak
-    source ~/.config/kak/wez.kak
-    source ~/.config/kak/def.kak
-    source ~/.config/kak/map.kak
+#------------------------------------------------------------------------------
+
+hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' %{
+    evaluate-commands -save-regs 'a' -itersel %{
+        execute-keys -itersel '<esc>;h'
+        set-register 'a' %sh{
+            inserted="$kak_selections"
+            op=( '"' '[' '{' '(' '<' )
+            cl=( '"' ']' '}' ')' '>' )
+            close=
+            for i in "${!op[@]}"; do
+            	[ $inserted == "${op[$i]}" ] && close="${cl[$i]}"
+            done
+            printf "$close"
+        }
+        execute-keys -itersel -with-hooks '"api'
+    }
+    hook window -group auto-pairs -once InsertChar '\n' %{
+       execute-keys "<a-;>;<ret><esc>KK<a-&>j<a-gt>"
+       execute-keys -with-hooks A
+    }
 }
+
+#------------------------------------------------------------------------------
+# lsp
+evaluate-commands %sh{kak-lsp --kakoune -s $kak_session}
+hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
+    lsp-enable-window
+}
+
+        set-option global lsp_hover_anchor true
+set-option global lsp_hover_max_lines 0
+set-option global lsp_insert_spaces true
+
+#------------------------------------------------------------------------------
+define-command kak-talk \
+    -docstring 'Send a kakoune command to the all sessions' \
+    -override \
+    -command-completion \
+    -params .. \
+     %{ nop %sh{ katalk $@ } }
+alias global kak kak-talk 
+
+define-command enable-auto-save \
+    -docstring 'Enable auto-save' \
+    -override \
+    %{
+        hook buffer -group autosave NormalIdle .* %{ try %{ write } }
+        hook buffer -group autosave InsertIdle .* %{ try %{ write } }
+    }
+
+define-command disable-auto-save \
+    -docstring 'Disable auto-save' \
+    -override \
+    %{ remove-hooks buffer autosave }
+
+define-command find-file \
+    -docstring 'Fuzzy search for the files'\
+    -override \
+    %{
+        prompt \
+        -menu  \
+        -shell-script-candidates %{fd -tf || find . -type f || return "sooqa"} \
+        'file: ' \
+        'edit %val{text}'
+    }
+
+define-command find-buffer \
+    -docstring 'Open an exising buffer' \
+    -override \
+    %{prompt -menu -buffer-completion 'buffer: ' 'buffer %val{text}' }
+
+define-command close-buffers \
+    -docstring 'Delete a buffer(s)' \
+    -override \
+    -buffer-completion \
+    -params .. \
+    %{ evaluate-commands %sh{
+        set -- "$@"
+        for buffer
+        do
+            printf "db $buffer" 
+        done
+    } }
+alias global cb close-buffers
+
+define-command ls \
+    -docstring 'List files in the current directory' \
+    -override \
+    %{ info -title "%val{client_env_PWD}/" %sh{ ls -Alh } }
+
+define-command sh \
+    -override \
+    -file-completion \
+    -params 1.. \
+    %{ echo %sh{ "$@" } }
+
+define-command set-filetype \
+    -docstring 'Set a filetype for current buffer' \
+    -override \
+    -params 1 \
+    %{ set-option current filetype %arg{1} }
+alias global lang set-filetype
+
+define-command new-file \
+    -docstring 'Create a new file(s)'\
+    -override \
+    -params 1.. \
+    %{ echo %sh{ touch "$@" }; edit %arg{1} }
+
+#------------------------------------------------------------------------------
+
+# thanks to https://github.com/vbauerster/wezterm.kak/blob/master/rc/wezterm.kak
+define-command wezterm \
+    -docstring 'Run wezterm in a new window' \
+    -override \
+    -params .. \
+    -shell-completion \
+    %{ nop %sh{ WEZTERM_PANE=$kak_client_env_WEZTERM_PANE wezterm "$@" }  }
+
+define-command wezterm-tab \
+    -docstring 'Open a new wezterm tab' \
+    -override \
+    -shell-completion \
+    -params .. \
+    %{ wezterm cli spawn --cwd %val{client_env_PWD} -- %arg{@} }
+
+define-command wezterm-vsplit \
+    -docstring 'Vertical split with the given arguments' \
+    -override \
+    -shell-completion \
+    -params .. \
+    %{ wezterm cli split-pane --right --cwd %val{client_env_PWD} -- %arg{@} }
+
+define-command wezterm-split \
+    -docstring 'Horizontal split with the given arguments' \
+    -override \
+    -shell-completion \
+    -params .. \
+    %{ wezterm cli split-pane --bottom --cwd %val{client_env_PWD} -- %arg{@} }
+
+define-command wezterm-new-window \
+    -docstring 'Open a new wezterm window' \
+    -override \
+    -shell-completion \
+    -params .. \
+    %{ wezterm cli spawn --new-window --cwd %val{client_env_PWD} -- %arg{@} }
+
+define-command vsplit \
+    -docstring 'Open the current buffer in vertical split' \
+    -override \
+    %{ wezterm-vsplit kak -c %val{session} }
+
+define-command split \
+    -docstring 'Open the current buffer in horizontal split' \
+    -override \
+    %{ wezterm-split kak -c %val{session} }
+
+define-command tab \
+    -docstring 'Open the current buffer in horizontal split' \
+    -override \
+    %{ wezterm-tab kak -c %val{session} }
+
+alias global wnw wezterm-new-window
+alias global wt wezterm-tab
+alias global wvs wezterm-vsplit
+alias global ws wezterm-split
+    
+#------------------------------------------------------------------------------
+hook global InsertChar j %{ try %{
+    exec -draft hH<a-k>kj<ret>d
+    exec <esc>
+} }
+
+
+map global normal X 'x_'    
+map global normal '#' ':comment-line<ret>'
+map global normal <c-g> ':ls<ret>'
+
+map global insert <c-u> '<esc>h<a-h>"_di'
+map global insert <c-w> '<esc>"_bdi'
+map global insert <c-h>   '<esc>;h"_di'
+
+map global user ';' 'y:<c-r>"<ret>' \
+    -docstring 'Push selected into cmd'
+map global user ':' 'y:<c-r>"<ret>' \
+    -docstring 'Push selected into cmd for all sessions'
+map global user / ':split<ret>' \
+    -docstring 'Open current buffer in new window'
+map global user b ':find-buffer<ret>' \
+    -docstring 'Serch for the active buffers'
+map global user f ':find-file<ret>' \
+    -docstring 'Search for the file'
+
+map global user y '<a-|>xsel --input --clipboard<ret>'\
+    -docstring 'Yank into system Clipboard'
+map global user P '!xsel --output --clipboard<ret>'\
+    -docstring 'Paste after a seletction from the system clipboard'
+map global user p '<a-!>xsel --output --clipboard<ret>'\
+    -docstring 'Paste before a seletction from the system clipboard'
+
+map global user l ':enter-user-mode lsp<ret>' \
+    -docstring 'Enter lsp-mode'
+    map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>'\
+    -docstring 'Select next snippet placeholder'
+map global user k ':lsp-hover<ret>'\
+    -docstring 'View LSP hover'
+map global user a ':lsp-code-actions<ret>'\
+    -docstring 'LPS code actions'
+map global object f '<a-semicolon>lsp-object Function Method<ret>'\
+    -docstring 'LSP function or method'
+map global object t '<a-semicolon>lsp-object Class Interface Struct<ret>'\
+    -docstring 'LSP class interface or struct'
+map global object d '<a-semicolon>lsp-diagnostic-object --include-warnings<ret>'\
+    -docstring 'LSP errors and warnings'
+
+declare-user-mode window-mode
+map global normal <c-w> ':enter-user-mode window-mode<ret>' \
+    -docstring 'Window Mode'
+map global window-mode v ':vsplit<ret>' \
+    -docstring 'Open the current buffer in vertical split'
+map global window-mode s ':split<ret>' \
+    -docstring 'Open the current buffer in horizontal split'
+map global window-mode t ':tab<ret>' \
+    -docstring 'Open the current buffer in new tab'
+map global window-mode q ':q<ret>' \
+    -docstring 'Close current window'
+
+#------------------------------------------------------------------------------

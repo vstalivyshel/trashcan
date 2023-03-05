@@ -9,8 +9,8 @@ if status is-interactive
     bind \ew walk
     setxkbmap -option "ctrl:nocaps"
 
-    set -g FZF_DEFAULT_COMMAND fd --hidden
-    set -g PYTHONDONTWRITEBYTECODE 1
+    set -U FZF_DEFAULT_COMMAND fd --hidden
+    set -U PYTHONDONTWRITEBYTECODE 1
 
     alias up='sudo dnf update -y && rustup update'
     alias dfs="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME"

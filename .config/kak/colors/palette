@@ -1,0 +1,87 @@
+lua vim.keymap.set("n", "<leader>c", "<cmd>ColorizerToggle<cr>")
+	# Gruvbox light
+bg0                     #fbf1c7
+bg1                     #ebdbb2
+bg2                     #d5c4a1
+bg3                     #bdae93
+bg4                     #a89984
+fg0                     #282828
+fg1                     #3c3836
+fg2                     #504945
+fg3                     #665c54
+fg4                     #7c6f64
+gray0                   #7c6f64
+gray1                   #928374
+red0                    #cc241d
+red1                    #9d0006
+green0                  #98971a
+green1                  #79740e
+yellow0                 #d79921
+yellow1                 #b57614
+blue0                   #458588
+blue1                   #076678
+purple0                 #b16286
+purple1                 #8f3f71
+aqua0                   #689d6a
+aqua1                   #427b58
+orange0                 #d65d0e
+orange1                 #af3a03
+base                    #f6f0c8
+text                    #545464
+status_bg               #d5cd9d
+status_fg               #43436c
+
+	# Rose pane palette
+love                    #eb6f92
+gold                    #f6c177
+rose                    #ebbcba
+pine                    #31748f
+foam                    #9ccfd8
+iris                    #c4a7e7
+	# Rose pine +
+overlay                 #26233a
+muted                   #6e6a86
+subtle                  #908caa
+surface                 #1f1d2e
+highlight_low           #21202e
+highlight_med           #403d52
+highlight_high          #524f67
+
+	# Kanagawa
+seaFoam                 #C7CCD1
+fujiWhite               #DCD7BA
+oldWhite                #C8C093
+sumiInk0                #16161D
+sumiInk1                #1F1F28
+sumiInk2                #2A2A37
+sumiInk3                #363646
+sumiInk4                #54546D
+waveBlue1               #223249
+waveBlue2               #2D4F67
+winterGreen             #2B3328
+winterYellow            #49443C
+winterRed               #43242B
+winterBlue              #252535
+autumnGreen             #76946A
+autumnRed               #C34043
+autumnYellow            #DCA561
+samuraiRed              #E82424
+roninYellow             #FF9E3B
+waveAqua1               #6A9589
+dragonBlue              #658594
+fujiGray                #727169
+springViolet1           #938AA9
+oniViolet               #957FB8
+crystalBlue             #7E9CD8
+springViolet2           #9CABCA
+springBlue              #7FB4CA
+lightBlue               #A3D4D5
+waveAqua2               #7AA89F
+springGreen             #98BB6C
+boatYellow1             #938056
+boatYellow2             #C0A36E
+carpYellow              #E6C384
+sakuraPink              #D27E99
+waveRed                 #E46876
+peachRed                #FF5D62
+surimiOrange            #FFA066
