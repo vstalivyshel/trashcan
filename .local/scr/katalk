@@ -7,5 +7,6 @@ set -- "$@"
 readarray -t list_sessions < <(kak -l)
 
 for ses in "${list_sessions[@]}"; do
+    kak -clear
     echo "$@" | kak -p "$ses"
 done

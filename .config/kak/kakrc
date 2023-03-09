@@ -1,48 +1,89 @@
 #------------------------------------------------------------------------------
-# colorscheme gruv-light
-# colorscheme rose-pine-dawn
-# colorscheme kanagawa
+colorscheme rose-pine-moon
+
 add-highlighter -override global/ number-lines -relative -hlcursor -separator \    
 set-option global ui_options terminal_assistant=none
 set-option global tabstop 4
 set-option global scrolloff 15,0
 set-option global startup_info_version 999999999
-set-option global disabled_hooks '.*-insert'
-# source ~/.config/kak/pykak/pykak.kak
 
 #------------------------------------------------------------------------------
 
+# https://git.sr.ht/~raiguard/kak-live-grep/tree/main/item/live-grep.kak
+
+# declare-option -hidden str live_grep_file  %{ %sh{ echo "/tmp/kak-live-grep." } }
+# define-command -override \
+#     %{
+#         set-option buffer filetype grep
+#         set-option buffer grep_current_line 0
+#         prompt -on-change %{
+#           evaluate-commands %sh{
+#               if [ -z $kak_quoted_text ]; then
+#                   exit 0
+#               fi
+#               "$kak_opt_grepcmd" "$kak_quoted_text"  | tr -d '\r' 2>&1 > "$kak_opt_live_grep_file"
+#           }    
+#         }
+#     }
+
+# ------------------------------------------------------------------------------
+
 hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' %{
-    evaluate-commands -save-regs 'a' -itersel %{
-        execute-keys -itersel '<esc>;h'
-        set-register 'a' %sh{
-            inserted="$kak_selections"
+    evaluate-commands -save-regs 'oc' -itersel %{
+        execute-keys -draft '<esc>h"oy'
+        set-register 'c' %sh{
+            inserted="$kak_reg_o"
             op=( '"' '[' '{' '(' '<' )
             cl=( '"' ']' '}' ')' '>' )
-            close=
+           close=
             for i in "${!op[@]}"; do
-            	[ $inserted == "${op[$i]}" ] && close="${cl[$i]}"
+               [ $inserted == "${op[$i]}" ] && close="${cl[$i]}"
             done
             printf "$close"
-        }
-        execute-keys -itersel -with-hooks '"api'
+       }
+        execute-keys -itersel '<a-;>;<a-;>"cP'
     }
-    hook window -group auto-pairs -once InsertChar '\n' %{
+    hook window -group insert-newline -once InsertChar '\n' %{
        execute-keys "<a-;>;<ret><esc>KK<a-&>j<a-gt>"
        execute-keys -with-hooks A
     }
+    hook window -group auto-pairs -once InsertChar '.*' %{
+        remove-hooks window insert-newline  
+    }
+    hook window -group auto-pairs -once ModeChange pop:insert:.* %{
+        remove-hooks window insert-newline
+    } 
 }
+
+#------------------------------------------------------------------------------
+
+# define-command surround-with-char \
+#     -override \
+#     -params 1 \
+#     %{
+#         declare-option -hidden str "'"
+#         hook window -once -group surround-with 
+#         execute-keys -with-hooks -itersel -draft -save-regs 'm' '"mdi' %arg{1} '<c-r>m' 
+#     }
+
+# declare-user-mode surround-mode
+# map global user s ''
 
 #------------------------------------------------------------------------------
 # lsp
 evaluate-commands %sh{kak-lsp --kakoune -s $kak_session}
 hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
     lsp-enable-window
+    set-option window lsp_hover_insert_mode_trigger nop 
 }
 
-        set-option global lsp_hover_anchor true
-set-option global lsp_hover_max_lines 0
+set-option global lsp_diagnostic_line_error_sign 'E'
+set-option global lsp_diagnostic_line_warning_sign 'W'
+set-option global lsp_diagnostic_line_info_sign 'I'
+set-option global lsp_diagnostic_line_hint_sign 'H'
+set-option global lsp_hover_anchor false
 set-option global lsp_insert_spaces true
+    
 
 #------------------------------------------------------------------------------
 define-command kak-talk \
@@ -56,7 +97,7 @@ alias global kak kak-talk
 define-command enable-auto-save \
     -docstring 'Enable auto-save' \
     -override \
-    %{
+   %{
         hook buffer -group autosave NormalIdle .* %{ try %{ write } }
         hook buffer -group autosave InsertIdle .* %{ try %{ write } }
     }
@@ -74,7 +115,7 @@ define-command find-file \
         -menu  \
         -shell-script-candidates %{fd -tf || find . -type f || return "sooqa"} \
         'file: ' \
-        'edit %val{text}'
+        %{ try %{ edit %val{text} } }
     }
 
 define-command find-buffer \
@@ -91,7 +132,7 @@ define-command close-buffers \
         set -- "$@"
         for buffer
         do
-            printf "db $buffer" 
+            echo "db $buffer" 
         done
     } }
 alias global cb close-buffers
@@ -122,76 +163,17 @@ define-command new-file \
 
 #------------------------------------------------------------------------------
 
-# thanks to https://github.com/vbauerster/wezterm.kak/blob/master/rc/wezterm.kak
-define-command wezterm \
-    -docstring 'Run wezterm in a new window' \
-    -override \
-    -params .. \
-    -shell-completion \
-    %{ nop %sh{ WEZTERM_PANE=$kak_client_env_WEZTERM_PANE wezterm "$@" }  }
-
-define-command wezterm-tab \
-    -docstring 'Open a new wezterm tab' \
-    -override \
-    -shell-completion \
-    -params .. \
-    %{ wezterm cli spawn --cwd %val{client_env_PWD} -- %arg{@} }
-
-define-command wezterm-vsplit \
-    -docstring 'Vertical split with the given arguments' \
-    -override \
-    -shell-completion \
-    -params .. \
-    %{ wezterm cli split-pane --right --cwd %val{client_env_PWD} -- %arg{@} }
-
-define-command wezterm-split \
-    -docstring 'Horizontal split with the given arguments' \
-    -override \
-    -shell-completion \
-    -params .. \
-    %{ wezterm cli split-pane --bottom --cwd %val{client_env_PWD} -- %arg{@} }
-
-define-command wezterm-new-window \
-    -docstring 'Open a new wezterm window' \
-    -override \
-    -shell-completion \
-    -params .. \
-    %{ wezterm cli spawn --new-window --cwd %val{client_env_PWD} -- %arg{@} }
-
-define-command vsplit \
-    -docstring 'Open the current buffer in vertical split' \
-    -override \
-    %{ wezterm-vsplit kak -c %val{session} }
-
-define-command split \
-    -docstring 'Open the current buffer in horizontal split' \
-    -override \
-    %{ wezterm-split kak -c %val{session} }
-
-define-command tab \
-    -docstring 'Open the current buffer in horizontal split' \
-    -override \
-    %{ wezterm-tab kak -c %val{session} }
-
-alias global wnw wezterm-new-window
-alias global wt wezterm-tab
-alias global wvs wezterm-vsplit
-alias global ws wezterm-split
-    
-#------------------------------------------------------------------------------
-hook global InsertChar j %{ try %{
+hook global -group escape-insert InsertChar j %{ try %{
     exec -draft hH<a-k>kj<ret>d
     exec <esc>
 } }
 
-
-map global normal X 'x_'    
+map global normal X 'x_'
 map global normal '#' ':comment-line<ret>'
-map global normal <c-g> ':ls<ret>'
+map global normal <c-g> ":ls<ret>"
 
-map global insert <c-u> '<esc>h<a-h>"_di'
-map global insert <c-w> '<esc>"_bdi'
-map global insert <c-h>   '<esc>;h"_di'
+map global insert <c-w> '<a-;>b<a-;>"_d'
+map global insert <c-h> <backspace>
 
 map global user ';' 'y:<c-r>"<ret>' \
     -docstring 'Push selected into cmd'
@@ -213,12 +195,8 @@ map global user p '<a-!>xsel --output --clipboard<ret>'\
 
 map global user l ':enter-user-mode lsp<ret>' \
     -docstring 'Enter lsp-mode'
-    map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>'\
+map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>'\
     -docstring 'Select next snippet placeholder'
-map global user k ':lsp-hover<ret>'\
-    -docstring 'View LSP hover'
-map global user a ':lsp-code-actions<ret>'\
-    -docstring 'LPS code actions'
 map global object f '<a-semicolon>lsp-object Function Method<ret>'\
     -docstring 'LSP function or method'
 map global object t '<a-semicolon>lsp-object Class Interface Struct<ret>'\

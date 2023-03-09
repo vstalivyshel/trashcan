@@ -1,12 +1,12 @@
 if status is-interactive
-    fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin $HOME/.local/scr
+    fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin $HOME/.local/scr $HOME/.nimble/bin
 
+	set fish_cursor_default block
     set -Ux EDITOR kak
     set -Ux VISUAL $EDITOR
 
     bind \cv $EDITOR
     bind \cl 'ls -Ahls; commandline -f repaint'
-    bind \ew walk
     setxkbmap -option "ctrl:nocaps"
 
     set -U FZF_DEFAULT_COMMAND fd --hidden

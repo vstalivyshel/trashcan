@@ -40,7 +40,7 @@ set-face	global	list				   "%opt{fg0}"
 
 # Builtins
 set-face	global	Default				   "%opt{fg1},%opt{bg0}"
-set-face	global	PrimarySelection	   "default,%opt{bg4}+g"
+set-face	global	PrimarySelection	   "default,%opt{bg2}+g"
 set-face	global	SecondarySelection	   "default,%opt{bg3}+g"
 set-face	global	PrimaryCursor		   "%opt{bg0},%opt{blue1}+g"
 set-face	global	PrimaryCursorEol	   "%opt{bg0},%opt{blue1}+g"
