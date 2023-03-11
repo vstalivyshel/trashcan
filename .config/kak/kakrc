@@ -1,5 +1,5 @@
 #------------------------------------------------------------------------------
-colorscheme rose-pine-moon
+colorscheme kanagawa
 
 add-highlighter -override global/ number-lines -relative -hlcursor -separator \    
 set-option global ui_options terminal_assistant=none
@@ -168,12 +168,22 @@ hook global -group escape-insert InsertChar j %{ try %{
     exec <esc>
 } }
 
+map global insert <c-w> '<a-;>b<a-;>"_d'
+map global insert <c-h> <backspace>
+map global insert <c-d> '<a-;>l<backspace>'
+map global insert <c-b> '<left>'
+map global insert <c-f> '<right>'
+map global insert <c-a> '<a-;>gh'
+map global insert <c-e> '<a-;>gl'
+map global insert <c-]> '<a-;>]p'
+map global insert <c-[> '<a-;>[p'
+map global insert <a-b> '<a-;>b'
+map global insert <a-w> '<a-;>w'
+
 map global normal X 'x_'
 map global normal '#' ':comment-line<ret>'
 map global normal <c-g> ":ls<ret>"
-
-map global insert <c-w> '<a-;>b<a-;>"_d'
-map global insert <c-h> <backspace>
+map global user w ":w<ret>"
 
 map global user ';' 'y:<c-r>"<ret>' \
     -docstring 'Push selected into cmd'
@@ -193,6 +203,10 @@ map global user P '!xsel --output --clipboard<ret>'\
 map global user p '<a-!>xsel --output --clipboard<ret>'\
     -docstring 'Paste before a seletction from the system clipboard'
 
+map global user k ':lsp-hover<ret>'\
+	-docstring 'Lsp-hover'
+map global user K ':lsp-hover-buffer<ret>'\
+    -docstring 'Lps-info in buffer'
 map global user l ':enter-user-mode lsp<ret>' \
     -docstring 'Enter lsp-mode'
 map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>'\

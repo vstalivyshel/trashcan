@@ -23,10 +23,13 @@ enable_audio_bell no
 enabled_layouts splits
 hide_window_decorations yes
 tab_bar_edge top
+tab_bar_style separator
+tab_separator "   "
 tab_title_max_length 25
-window_border_width 0.1pt
+window_border_width 0.0pt
 # active_border_color none
 # active_border_color none
+inactive_text_alpha 0.7
 
 close_on_child_death yes
 # remote_control_password
@@ -37,10 +40,12 @@ allow_remote_control yes
 # clipboard_control write-clipboard write-primary read-clipboard-ask read-primary-ask
 # clipboard_max_size 64
 # file_transfer_confirmation_bypass
-# shell_integration disable
+shell_integration no-cursor
 # allow_cloning ask
 # clone_source_strategies venv,conda,env_var,path
 # linux_display_server auto
+
+map kitty_mod+o show_scrollback
 
 # font
 map ctrl+equal       change_font_size all +0.3
@@ -52,20 +57,25 @@ map f1 launch --stdin-source=@screen_scrollback --stdin-add-formatting --type=ov
 map f2 launch --type=tab goto
 map f3 launch --type=tab colors
 
-# Splits
+# splits
 map alt+minus     launch --cwd=current --location=hsplit
 map alt+\     launch --cwd=current --location=vsplit
 map alt+enter launch --cwd=current --type=tab
 
-# Fix for the kakoune
-map ctrl+m send_text kitty \r
-map ctrl+[ send_text kitty \x1b
-
-map kitty_mod+r start_resizing_window
-
 map alt+0 next_window
 map alt+9 previous_window
 
+map kitty_mod+h resize_window narrower  3
+map kitty_mod+l resize_window wider 3
+map kitty_mod+k resize_window taller 3
+map kitty_mod+j resize_window shorter 3
+map kitty_mod+r resize_window 3 
+
+# fix for the kakoune
+map ctrl+m send_text kitty \r
+map ctrl+[ send_text kitty \x1b
+
+# tabs
 map alt+tab        next_tab
 map alt+shift+tab  previous_tab
 map kitty_mod+q    close_tab
@@ -79,8 +89,7 @@ map alt+6 goto_tab 6
 map alt+7 goto_tab 7
 map alt+8 goto_tab 8
 
-
 # BEGIN_KITTY_THEME
-# kanagawabones
+# Rosé Pine
 include current-theme.conf
 # END_KITTY_THEME
