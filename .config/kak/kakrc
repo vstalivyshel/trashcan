@@ -1,30 +1,54 @@
-#------------------------------------------------------------------------------
-colorscheme kanagawa
+colorscheme gruv-light
 
 add-highlighter -override global/ number-lines -relative -hlcursor -separator \    
 set-option global ui_options terminal_assistant=none
 set-option global tabstop 4
 set-option global scrolloff 15,0
 set-option global startup_info_version 999999999
-
 #------------------------------------------------------------------------------
 
-# https://git.sr.ht/~raiguard/kak-live-grep/tree/main/item/live-grep.kak
+map global insert <c-w> '<a-;>b<a-;>"_d'
+map global insert <c-h> <backspace>
+map global insert <c-a> '<a-;>gi'
+map global insert <c-e> '<a-;>gl'
+map global insert <c-b> '<left>'
+map global insert <c-f> '<right>'
+map global insert <a-b> '<a-;>b<a-;>;'
+map global insert <a-w> '<a-;>w<a-;>;'
 
-# declare-option -hidden str live_grep_file  %{ %sh{ echo "/tmp/kak-live-grep." } }
-# define-command -override \
-#     %{
-#         set-option buffer filetype grep
-#         set-option buffer grep_current_line 0
-#         prompt -on-change %{
-#           evaluate-commands %sh{
-#               if [ -z $kak_quoted_text ]; then
-#                   exit 0
-#               fi
-#               "$kak_opt_grepcmd" "$kak_quoted_text"  | tr -d '\r' 2>&1 > "$kak_opt_live_grep_file"
-#           }    
-#         }
-#     }
+map global insert <a-]> '<a-;>]p<a-;>;'
+map global insert <a-[> '<a-;>[p<a-;>;'
+map global insert <a-,> '<a-;><'
+map global insert <a-.> '<a-;>>'
+map global insert <a-O> '<a-;>O'
+map global insert <a-o> '<a-;>o'
+
+map global normal X 'x_'
+map global normal '#' ':comment-line<ret>'
+map global normal <c-g> ":ls<ret>"
+map global user w ":w<ret>" \
+    -docstring 'Save'
+
+map global user t ':todo<ret>' \
+    -docstring 'Open todo-file'
+map global user ';' 'y:<c-r>"<ret>' \
+    -docstring 'Push selected into cmd'
+map global user ':' 'y:<c-r>"<ret>' \
+    -docstring 'Push selected into cmd for all sessions'
+map global user / ':split<ret>' \
+    -docstring 'Open current buffer in new window'
+map global user b ':find-buffer<ret>' \
+    -docstring 'Serch for the active buffers'
+map global user f ':find-file<ret>' \
+    -docstring 'Search for the file'
+
+map global user y '<a-|>xsel --input --clipboard<ret>'\
+    -docstring 'Yank into system Clipboard'
+map global user P '!xsel --output --clipboard<ret>'\
+    -docstring 'Paste after a seletction from the system clipboard'
+map global user p '<a-!>xsel --output --clipboard<ret>'\
+    -docstring 'Paste before a seletction from the system clipboard'
+
 
 # ------------------------------------------------------------------------------
 
@@ -57,35 +81,22 @@ hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' %{
 
 #------------------------------------------------------------------------------
 
-# define-command surround-with-char \
-#     -override \
-#     -params 1 \
-#     %{
-#         declare-option -hidden str "'"
-#         hook window -once -group surround-with 
-#         execute-keys -with-hooks -itersel -draft -save-regs 'm' '"mdi' %arg{1} '<c-r>m' 
-#     }
+define-command todo \
+    -docstring 'Open todo file' \
+    -override \
+    %{
+        declare-option -hidden str todofile  "/home/vstalivyshel/HoneyBunny/Notes/todo.todo"
+        echo %sh{
+            todo_file="$kak_opt_todofile"
+            if ![ -f "$todo_file" ]; then
+                touch "$todo_file"
+            fi
+        }
+        edit %opt{todofile}
+        enable-auto-save
+        set-option buffer filetype markdown
+    }
 
-# declare-user-mode surround-mode
-# map global user s ''
-
-#------------------------------------------------------------------------------
-# lsp
-evaluate-commands %sh{kak-lsp --kakoune -s $kak_session}
-hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
-    lsp-enable-window
-    set-option window lsp_hover_insert_mode_trigger nop 
-}
-
-set-option global lsp_diagnostic_line_error_sign 'E'
-set-option global lsp_diagnostic_line_warning_sign 'W'
-set-option global lsp_diagnostic_line_info_sign 'I'
-set-option global lsp_diagnostic_line_hint_sign 'H'
-set-option global lsp_hover_anchor false
-set-option global lsp_insert_spaces true
-    
-
-#------------------------------------------------------------------------------
 define-command kak-talk \
     -docstring 'Send a kakoune command to the all sessions' \
     -override \
@@ -161,50 +172,56 @@ define-command new-file \
     -params 1.. \
     %{ echo %sh{ touch "$@" }; edit %arg{1} }
 
+define-command vsplit \
+    -override \
+    -docstring 'Open current buffer in vertical split' \
+    %{
+        nop %sh{ kitty @launch --cwd=$kak_client_env_PWD   htop}
+    }
 #------------------------------------------------------------------------------
 
-hook global -group escape-insert InsertChar j %{ try %{
-    exec -draft hH<a-k>kj<ret>d
-    exec <esc>
-} }
+define-command kitty \
+    -docstring 'Talk to kitty' \
+    -override \
+    -params 1.. \
+    -shell-completion \
+    %{ echo %sh{
+        cwd=$( dirname "$kak_buffile" )
+        [ $1 == "tab" ] &&  location="--type=tab" || location="--location=$1"
+        [ -z $2 ] && invoke="kak -c $kak_session" || invoke="$@"
+        kitty @launch --cwd="$cwd" "$location" $invoke
+    } }
 
-map global insert <c-w> '<a-;>b<a-;>"_d'
-map global insert <c-h> <backspace>
-map global insert <c-d> '<a-;>l<backspace>'
-map global insert <c-b> '<left>'
-map global insert <c-f> '<right>'
-map global insert <c-a> '<a-;>gh'
-map global insert <c-e> '<a-;>gl'
-map global insert <c-]> '<a-;>]p'
-map global insert <c-[> '<a-;>[p'
-map global insert <a-b> '<a-;>b'
-map global insert <a-w> '<a-;>w'
+declare-user-mode window-mode
+map global normal <c-w> ":enter-user-mode window-mode<ret>"
+map global window-mode q ":q<ret>" \
+	-docstring 'Close current window'
+map global window-mode v ":kitty vsplit<ret>" \
+    -docstring 'Open current buffer in vertical split'
+map global window-mode s ":kitty hsplit<ret>" \
+    -docstring 'Open current buffer in horizontal split'
+map global window-mode t ":kitty tab<ret>" \
+    -docstring 'Open current buffer in new tab'
 
-map global normal X 'x_'
-map global normal '#' ':comment-line<ret>'
-map global normal <c-g> ":ls<ret>"
-map global user w ":w<ret>"
+#------------------------------------------------------------------------------
 
-map global user ';' 'y:<c-r>"<ret>' \
-    -docstring 'Push selected into cmd'
-map global user ':' 'y:<c-r>"<ret>' \
-    -docstring 'Push selected into cmd for all sessions'
-map global user / ':split<ret>' \
-    -docstring 'Open current buffer in new window'
-map global user b ':find-buffer<ret>' \
-    -docstring 'Serch for the active buffers'
-map global user f ':find-file<ret>' \
-    -docstring 'Search for the file'
-
-map global user y '<a-|>xsel --input --clipboard<ret>'\
-    -docstring 'Yank into system Clipboard'
-map global user P '!xsel --output --clipboard<ret>'\
-    -docstring 'Paste after a seletction from the system clipboard'
-map global user p '<a-!>xsel --output --clipboard<ret>'\
-    -docstring 'Paste before a seletction from the system clipboard'
+evaluate-commands %sh{ kak-lsp --kakoune -s $kak_session }
+hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
+    lsp-enable-window
+    set-option global lsp_diagnostic_line_error_sign 'E'
+    set-option global lsp_diagnostic_line_warning_sign 'W'
+    set-option global lsp_diagnostic_line_info_sign 'I'
+    set-option global lsp_diagnostic_line_hint_sign 'H'
+    set-option global lsp_hover_anchor false
+    set-option global lsp_insert_spaces true
+    set-option global lsp_config %{
+        [language.rust.settings.rust-analyzer.check]
+        command = "clippy"
+    }
+}
 
 map global user k ':lsp-hover<ret>'\
-	-docstring 'Lsp-hover'
+    -docstring 'Lsp-hover'
 map global user K ':lsp-hover-buffer<ret>'\
     -docstring 'Lps-info in buffer'
 map global user l ':enter-user-mode lsp<ret>' \
@@ -217,17 +234,5 @@ map global object t '<a-semicolon>lsp-object Class Interface Struct<ret>'\
     -docstring 'LSP class interface or struct'
 map global object d '<a-semicolon>lsp-diagnostic-object --include-warnings<ret>'\
     -docstring 'LSP errors and warnings'
-
-declare-user-mode window-mode
-map global normal <c-w> ':enter-user-mode window-mode<ret>' \
-    -docstring 'Window Mode'
-map global window-mode v ':vsplit<ret>' \
-    -docstring 'Open the current buffer in vertical split'
-map global window-mode s ':split<ret>' \
-    -docstring 'Open the current buffer in horizontal split'
-map global window-mode t ':tab<ret>' \
-    -docstring 'Open the current buffer in new tab'
-map global window-mode q ':q<ret>' \
-    -docstring 'Close current window'
 
 #------------------------------------------------------------------------------

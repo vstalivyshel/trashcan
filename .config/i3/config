@@ -188,7 +188,7 @@ bindsym $mod+r mode "resize"
 # finds out, if available)
 bar {
 	mode hide
-        status_command i3status
+    status_command i3status
 }
 
 bindsym $mod+Shift+Home exec systemctl reboot

@@ -36,8 +36,8 @@ set-face	global	list				"%opt{rose}"
 
 # Builtins
 set-face	global	Default				"%opt{text},%opt{base}"
-set-face	global	PrimarySelection	"default,%opt{highlight_med}+g"
-set-face	global	SecondarySelection	"default,%opt{overlay}+g"
+set-face	global	PrimarySelection	"default,%opt{overlay}+g"
+set-face	global	SecondarySelection	"default,%opt{highlight_med}+g"
 set-face	global	PrimaryCursor		"%opt{text},%opt{muted}+g"
 set-face	global	SecondaryCursor		"%opt{text},%opt{highlight_high}+g"
 set-face	global	PrimaryCursorEol	"%opt{text},%opt{muted}"

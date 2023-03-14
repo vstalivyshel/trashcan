@@ -1,62 +1,24 @@
 #!/bin/env bash
 
-if command -v exa &> /dev/null; then
-  list_items_command='exa -a --git --color=always --group-directories-first'
-else
-  list_items_command='ls --A --color=always'
-fi 
+content=$(cat $HOME/.config/goto.storage | tr "\n" " ")
+selected=$(find $content -maxdepth 1 -type d | fzf)
 
-if command -v bat &> /dev/null; then
-  preview_command="bat --color always --decorations never --theme ansi"
-else
-  preview_command='cat'
+if [[ -z "$selected" ]]; then
+    exit 0
 fi
 
-if [[ $SHELL == *"fish"* ]]; then
-  preview_function="
-    if test -d {}
-        $list_items_command -l {}
-    else
-        $preview_command {}
-    end
-  "
-else
-  preview_function="
-    if [[ -d {} ]]; then
-      $list_items_command -l {}
-    else
-      $preview_command {}
+builtin cd "$selected" || return 
+
+if [[ "$EDITOR" == *"kak"* ]]; then
+    name=$(basename "$PWD" | tr "." "_")
+    socket_name=$(kak -l | grep "$name")
+
+    if [[ -z "$socket_name" ]]; then
+        setsid kak -d -s "$name" &
+        sleep 0.05
     fi
-  "
+
+    kak -c "$name"
+else
+    "$EDITOR"
 fi
-
-open_selected() {
-  if [[ -d $1 ]]; then
-    builtin cd "$1" || return
-  elif [[ -f $1 ]]; then
-    $EDITOR "$1"
-  elif [[ -z $1 ]]; then
-    $SHELL
-	exit 0
-  fi
-}
-
-list_items() {
-  $list_items_command | fzf \
-    --ansi --cycle \
-    --bind "ctrl-b:preview-half-page-up"\
-    --bind "ctrl-f:preview-half-page-down"\
-    --bind "ctrl-h:execute(echo ..)+abort"\
-    --bind "ctrl-l:accept"\
-    --preview-window=70%\
-    --preview "$preview_function"
-    
-}
-
-test -d "$1"; builtin cd "$1" || return
-
-while true
-do
-  item=$(list_items)
-  open_selected "$item"
-done

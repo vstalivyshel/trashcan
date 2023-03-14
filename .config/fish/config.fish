@@ -12,9 +12,8 @@ if status is-interactive
     set -U FZF_DEFAULT_COMMAND fd --hidden
     set -U PYTHONDONTWRITEBYTECODE 1
 
-    alias up='sudo dnf update -y && rustup update'
+    alias up='sudo dnf update -y; rustup update; brew update'
     alias dfs="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME"
-    alias dfss="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME status"
     alias dfsdo='dfs commit -a -m "yea"; dfs push origin main'
 
     eval (/home/linuxbrew/.linuxbrew/bin/brew shellenv)
