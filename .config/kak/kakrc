@@ -1,6 +1,6 @@
 colorscheme gruv-light
 
-add-highlighter -override global/ number-lines -relative -hlcursor -separator \    
+add-highlighter -override global/ number-lines -relative -hlcursor -separator '  '
 set-option global ui_options terminal_assistant=none
 set-option global tabstop 4
 set-option global scrolloff 15,0
@@ -59,11 +59,11 @@ hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' %{
             inserted="$kak_reg_o"
             op=( '"' '[' '{' '(' '<' )
             cl=( '"' ']' '}' ')' '>' )
-           close=
+            close=
             for i in "${!op[@]}"; do
-               [ $inserted == "${op[$i]}" ] && close="${cl[$i]}"
+               [ $inserted == "${op[$i]}" ] && close="${cl[$i]}" && break
             done
-            printf "$close"
+            printf %s "$close"
        }
         execute-keys -itersel '<a-;>;<a-;>"cP'
     }
@@ -85,7 +85,7 @@ define-command todo \
     -docstring 'Open todo file' \
     -override \
     %{
-        declare-option -hidden str todofile  "/home/vstalivyshel/HoneyBunny/Notes/todo.todo"
+        declare-option -hidden str todofile  "/home/vstalivyshel/HoneyBunny/Notes/.todo.md"
         echo %sh{
             todo_file="$kak_opt_todofile"
             if ![ -f "$todo_file" ]; then
@@ -188,10 +188,38 @@ define-command kitty \
     %{ echo %sh{
         cwd=$( dirname "$kak_buffile" )
         [ $1 == "tab" ] &&  location="--type=tab" || location="--location=$1"
-        [ -z $2 ] && invoke="kak -c $kak_session" || invoke="$@"
+        shift
+        [ -z $1 ] && invoke="kak -c $kak_session" || invoke="--hold $@"
         kitty @launch --cwd="$cwd" "$location" $invoke
     } }
 
+define-command run \
+    -override \
+    -docstring 'Run shell command in vertical split' \
+    -params 1.. \
+    %{ evaluate-commands kitty vsplit %arg{@} }
+
+declare-option str runcmd
+
+define-command run-code \
+    -override \
+    %{ evaluate-commands run %sh{
+            runcmd=
+            file="$kak_buffile"
+            case $kak_opt_filetype in
+                "lua") runcmd="lua $file"
+                ;;
+                "python") runcmd="python3 $file"
+                ;;
+                "sh") runcmd="bash $file"
+                ;;
+                "rust") runcmd="cargo run" 
+                ;;
+            esac
+            printf %s "$runcmd"
+    } }
+
+map global user r ':run-code<ret>'
 declare-user-mode window-mode
 map global normal <c-w> ":enter-user-mode window-mode<ret>"
 map global window-mode q ":q<ret>" \
@@ -205,8 +233,13 @@ map global window-mode t ":kitty tab<ret>" \
 
 #------------------------------------------------------------------------------
 
+# source /home/vstalivyshel/.config/kak/cargo.kak
+# hook global WinSetOption filetype=rust %{
+#     set-option global formatcmd 'rustfmt %val{buffile}'
+# }
+
 evaluate-commands %sh{ kak-lsp --kakoune -s $kak_session }
-hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
+    hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
     lsp-enable-window
     set-option global lsp_diagnostic_line_error_sign 'E'
     set-option global lsp_diagnostic_line_warning_sign 'W'
