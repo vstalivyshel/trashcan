@@ -4,6 +4,7 @@ if status is-interactive
     set fish_cursor_default block
     set -Ux EDITOR kak
     set -Ux VISUAL $EDITOR
+    set -Ux STORAGE_PATH "/home/vstalivyshel/.config/storage.storage"
 
     bind \cv $EDITOR
     bind \cl 'ls -Ahls; commandline -f repaint'

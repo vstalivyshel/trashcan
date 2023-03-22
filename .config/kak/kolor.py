@@ -140,5 +140,6 @@ def main():
         with open(colorscheme_path, "a") as f:
             f.write(echo_face)
 
+
 if __name__ == '__main__':
     main()

@@ -1,10 +1,15 @@
 colorscheme gruv-light
+#------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
 add-highlighter -override global/ number-lines -relative -hlcursor -separator '  '
 set-option global ui_options terminal_assistant=none
+set-option global autoinfo command
 set-option global tabstop 4
 set-option global scrolloff 15,0
 set-option global startup_info_version 999999999
+
+#------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
 map global insert <c-w> '<a-;>b<a-;>"_d'
@@ -15,7 +20,6 @@ map global insert <c-b> '<left>'
 map global insert <c-f> '<right>'
 map global insert <a-b> '<a-;>b<a-;>;'
 map global insert <a-w> '<a-;>w<a-;>;'
-
 map global insert <a-]> '<a-;>]p<a-;>;'
 map global insert <a-[> '<a-;>[p<a-;>;'
 map global insert <a-,> '<a-;><'
@@ -25,23 +29,15 @@ map global insert <a-o> '<a-;>o'
 
 map global normal X 'x_'
 map global normal '#' ':comment-line<ret>'
-map global normal <c-g> ":ls<ret>"
+
 map global user w ":w<ret>" \
     -docstring 'Save'
-
-map global user t ':todo<ret>' \
-    -docstring 'Open todo-file'
 map global user ';' 'y:<c-r>"<ret>' \
     -docstring 'Push selected into cmd'
 map global user ':' 'y:<c-r>"<ret>' \
     -docstring 'Push selected into cmd for all sessions'
-map global user / ':split<ret>' \
-    -docstring 'Open current buffer in new window'
-map global user b ':find-buffer<ret>' \
-    -docstring 'Serch for the active buffers'
-map global user f ':find-file<ret>' \
-    -docstring 'Search for the file'
 
+# clipboard
 map global user y '<a-|>xsel --input --clipboard<ret>'\
     -docstring 'Yank into system Clipboard'
 map global user P '!xsel --output --clipboard<ret>'\
@@ -49,8 +45,89 @@ map global user P '!xsel --output --clipboard<ret>'\
 map global user p '<a-!>xsel --output --clipboard<ret>'\
     -docstring 'Paste before a seletction from the system clipboard'
 
+#------------------------------------------------------------------------------
+# splits ----------------------------------------------------------------------
+
+define-command buf-vsplit \
+    -override \
+    %{ tmux-terminal-horizontal kak -c %val{session} -e "e %val{buffile} ; select %val{selection_desc} ; exec vv"  }
+
+define-command buf-hsplit \
+    -override \
+    %{ tmux-terminal-vertical kak -c %val{session} -e "e %val{buffile} ; select %val{selection_desc} ; exec vv"  }
+
+define-command buf-tab \
+    -override \
+    %{ tmux-terminal-window kak -c %val{session} -e "e %val{buffile} ; select %val{selection_desc} ; exec vv"  }
+
+define-command vsplit \
+	-override \
+	%{ evaluate-commands tmux splitw -h %opt{connect_me} }
+
+declare-user-mode window-mode
+
+map global normal <c-w> ":enter-user-mode window-mode<ret>"
+map global window-mode q ":q<ret>" \
+	-docstring 'Close current window'
+map global window-mode v ":buf-vsplit<ret>" \
+    -docstring 'Open current buffer in vertical split'
+map global window-mode s ":buf-hsplit<ret>" \
+    -docstring 'Open current buffer in horizontal split'
+map global window-mode t ":buf-tab<ret>" \
+    -docstring 'Open current buffer in new tab'
+
+#------------------------------------------------------------------------------
+# code-runner -----------------------------------------------------------------
+ 
+
+declare-option -hidden str run_pos "h"
+define-command change-exec-pos \
+	-docstring 'Toggle vsplit/hsplit' \
+	-override \
+	%{
+    	set global run_pos %sh{
+        	new_pos=
+        	case "$kak_opt_run_pos" in
+        		"h") new_pos="v" ;;
+        		"v") new_pos="h" ;;
+        		*) new_pos="v" ;;
+    		esac
+    		printf %s "$new_pos"
+    	}
+    	echo "NEW POS: %opt{run_pos}"
+	}
+map global user s ':change-exec-pos<ret>' \
+    -docstring 'Switch run-code command position'
+
+define-command run-code \
+    -override \
+    -params .. \
+    %{ echo %sh{
+        execute=
+        pos=
+        code="$kak_buffile"
+        case $kak_opt_filetype in
+            "lua") execute="lua $code"
+            ;;
+            "python") execute="python3 $code"
+            ;;
+            "sh") execute="bash $code"
+            ;;
+            "rust") execute="cargo run --" 
+            ;;
+        esac
+        tmux splitw -"$kak_opt_run_pos" "$execute $@ ; $SHELL"
+    } }
+map global user r ':run-code<ret>' \
+    -docstring 'Execute current file'
+
+define-command -hidden run-code-with-args \
+    %{ prompt 'Args to code: ' %{ run-code %val{text} }  }
+map global user R ':run-code-with-args<ret>' \
+    -docstring 'Execute current file with given args'
 
 # ------------------------------------------------------------------------------
+# auto-pairs--------------------------------------------------------------------
 
 hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' %{
     evaluate-commands -save-regs 'oc' -itersel %{
@@ -80,22 +157,32 @@ hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' %{
 }
 
 #------------------------------------------------------------------------------
+# little helper----------------------------------------------------------------
+
+define-command auto-info \
+	-docstring 'command|onkey|normal' \
+	-override \
+	-params 1 \
+	%{ set buffer autoinfo %arg{@} }
 
 define-command todo \
-    -docstring 'Open todo file' \
+    -docstring 'Open a todo file' \
     -override \
     %{
-        declare-option -hidden str todofile  "/home/vstalivyshel/HoneyBunny/Notes/.todo.md"
+        declare-option -hidden str todofile \
+            "/home/vstalivyshel/HoneyBunny/Notes/.todo.md"
         echo %sh{
             todo_file="$kak_opt_todofile"
             if ![ -f "$todo_file" ]; then
                 touch "$todo_file"
             fi
         }
-        edit %opt{todofile}
+            	edit %opt{todofile}
         enable-auto-save
         set-option buffer filetype markdown
     }
+map global user t ':todo<ret>' \
+    -docstring 'Open todo-file'
 
 define-command kak-talk \
     -docstring 'Send a kakoune command to the all sessions' \
@@ -105,34 +192,43 @@ define-command kak-talk \
      %{ nop %sh{ katalk $@ } }
 alias global kak kak-talk 
 
-define-command enable-auto-save \
-    -docstring 'Enable auto-save' \
-    -override \
-   %{
-        hook buffer -group autosave NormalIdle .* %{ try %{ write } }
-        hook buffer -group autosave InsertIdle .* %{ try %{ write } }
-    }
-
-define-command disable-auto-save \
-    -docstring 'Disable auto-save' \
-    -override \
-    %{ remove-hooks buffer autosave }
+define-command toggle-auto-save -override %{
+    declare-option -hidden bool auto_save_status false
+  	evaluate-commands %sh{
+        case "$kak_opt_auto_save_status" in
+        false) printf %s "
+    		hook buffer -group autosave NormalIdle .* %{ try %{ write } }
+            hook buffer -group autosave InsertIdle .* %{ try %{ write } }
+        	set-option buffer auto_save_status true
+ 			echo 'AUTO-SAVE ENABLED'
+ 			echo -debug 'AUTO-SAVE ENABLED'" ;;
+    	true) printf %s "remove-hooks buffer autosave
+    		set-option buffer auto_save_status false
+ 			echo -debug 'AUTO-SAVE DISABLED'
+ 			echo 'AUTO-SAVE DISABLED'" ;;
+        esac
+} }
 
 define-command find-file \
     -docstring 'Fuzzy search for the files'\
     -override \
-    %{
-        prompt \
-        -menu  \
-        -shell-script-candidates %{fd -tf || find . -type f || return "sooqa"} \
-        'file: ' \
-        %{ try %{ edit %val{text} } }
+    -params .. \
+    %{ prompt  -menu \
+    	-shell-script-candidates %{fd -tf $@ } \
+        'file: '  %{ try %{ edit %val{text} } }
     }
+
+map global user f ':find-file<ret>' \
+    -docstring 'Search for the file'
+map global user F ':find-file ' \
+    -docstring 'Search for the file with args'
 
 define-command find-buffer \
     -docstring 'Open an exising buffer' \
     -override \
     %{prompt -menu -buffer-completion 'buffer: ' 'buffer %val{text}' }
+map global user b ':find-buffer<ret>' \
+    -docstring 'Serch for the active buffers'
 
 define-command close-buffers \
     -docstring 'Delete a buffer(s)' \
@@ -143,7 +239,7 @@ define-command close-buffers \
         set -- "$@"
         for buffer
         do
-            echo "db $buffer" 
+        	echo "db $buffer" 
         done
     } }
 alias global cb close-buffers
@@ -151,7 +247,8 @@ alias global cb close-buffers
 define-command ls \
     -docstring 'List files in the current directory' \
     -override \
-    %{ info -title "%val{client_env_PWD}/" %sh{ ls -Alh } }
+    %{ info -title "%val{buffile}" %sh{ ls -Alh } }
+map global normal <c-g> ":ls<ret>"
 
 define-command sh \
     -override \
@@ -171,101 +268,230 @@ define-command new-file \
     -override \
     -params 1.. \
     %{ echo %sh{ touch "$@" }; edit %arg{1} }
-
-define-command vsplit \
-    -override \
-    -docstring 'Open current buffer in vertical split' \
-    %{
-        nop %sh{ kitty @launch --cwd=$kak_client_env_PWD   htop}
-    }
-#------------------------------------------------------------------------------
-
-define-command kitty \
-    -docstring 'Talk to kitty' \
-    -override \
-    -params 1.. \
-    -shell-completion \
-    %{ echo %sh{
-        cwd=$( dirname "$kak_buffile" )
-        [ $1 == "tab" ] &&  location="--type=tab" || location="--location=$1"
-        shift
-        [ -z $1 ] && invoke="kak -c $kak_session" || invoke="--hold $@"
-        kitty @launch --cwd="$cwd" "$location" $invoke
-    } }
-
-define-command run \
-    -override \
-    -docstring 'Run shell command in vertical split' \
-    -params 1.. \
-    %{ evaluate-commands kitty vsplit %arg{@} }
-
-declare-option str runcmd
-
-define-command run-code \
-    -override \
-    %{ evaluate-commands run %sh{
-            runcmd=
-            file="$kak_buffile"
-            case $kak_opt_filetype in
-                "lua") runcmd="lua $file"
-                ;;
-                "python") runcmd="python3 $file"
-                ;;
-                "sh") runcmd="bash $file"
-                ;;
-                "rust") runcmd="cargo run" 
-                ;;
-            esac
-            printf %s "$runcmd"
-    } }
-
-map global user r ':run-code<ret>'
-declare-user-mode window-mode
-map global normal <c-w> ":enter-user-mode window-mode<ret>"
-map global window-mode q ":q<ret>" \
-	-docstring 'Close current window'
-map global window-mode v ":kitty vsplit<ret>" \
-    -docstring 'Open current buffer in vertical split'
-map global window-mode s ":kitty hsplit<ret>" \
-    -docstring 'Open current buffer in horizontal split'
-map global window-mode t ":kitty tab<ret>" \
-    -docstring 'Open current buffer in new tab'
+alias global nf new-file
 
 #------------------------------------------------------------------------------
+#file-browser---------------------------------------------------------------------
 
-# source /home/vstalivyshel/.config/kak/cargo.kak
-# hook global WinSetOption filetype=rust %{
-#     set-option global formatcmd 'rustfmt %val{buffile}'
+# define-command browse \
+#     -override \
+#     -file-completion \
+#     -params ..1 \
+# %{
+
 # }
 
-evaluate-commands %sh{ kak-lsp --kakoune -s $kak_session }
-    hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
-    lsp-enable-window
-    set-option global lsp_diagnostic_line_error_sign 'E'
-    set-option global lsp_diagnostic_line_warning_sign 'W'
-    set-option global lsp_diagnostic_line_info_sign 'I'
-    set-option global lsp_diagnostic_line_hint_sign 'H'
-    set-option global lsp_hover_anchor false
-    set-option global lsp_insert_spaces true
-    set-option global lsp_config %{
-        [language.rust.settings.rust-analyzer.check]
-        command = "clippy"
+
+#------------------------------------------------------------------------------
+#zen-mode----------------------------------------------------------------------
+
+# Have no idea how to display only one number of lines, so it is useless for now
+
+# define-command toggle-zen-mode -override %{
+# 	declare-option -hidden bool zen_status false
+# 	declare-option -hidden str zen_sepr '          '
+# 	evaluate-commands %sh{
+# 		case $kak_opt_zen_status in
+#     	false) printf %s "
+#         	addhl window/zen number-lines -min-digits 10 -separator '$kak_opt_zen_sepr'
+#             addhl window/zen1 number-lines -min-digits 10 -separator '$kak_opt_zen_sepr'
+#             addhl window/zen2 number-lines -min-digits 3 -separator '$kak_opt_zen_sepr'
+#     		set-option window zen_status true" ;;
+# 		true) printf %s "
+# 			remove-highlighter window/zen
+#            	remove-highlighter window/zen1
+#            	remove-highlighter window/zen2
+#            	set-option window zen_status false" ;;
+# 		esac
+# 	}
+# }
+
+#------------------------------------------------------------------------------
+# rust helpers-----------------------------------------------------------------
+
+define-command rust-fmt \
+	-override \
+	-docstring 'Format a rust code' \
+    %{ try %{ write } ; echo %sh{ rustfmt $kak_buffile} }
+alias global fmt rust-fmt
+
+declare-user-mode cargo
+
+map global user c ':enter-user-mode cargo<ret>' \
+    -docstring 'Cargo mode'
+map global cargo f ':fmt<ret>' \
+	-docstring 'Format rust code'
+map  global cargo t %{:write; cargo test<ret>} \
+    -docstring "Run tests" 
+map  global cargo c %{:write; cargo clippy --all-targets<ret>} \
+    -docstring "Check syntax" 
+map  global cargo n %{: cargo-next-error<ret>} \
+    -docstring "Next error" 
+map  global cargo p %{: cargo-previous-error<ret>} \
+    -docstring "Previous error" 
+
+#------------------------------------------------------------------------------
+# some stolen code(plugin)-----------------------------------------------------
+# Thx to https://gitlab.com/Screwtapello/kakoune-cargo/-/blob/master/cargo.kak
+# And to https://github.com/krornus/kakoune-cargo
+
+add-highlighter -override shared/cargo group
+add-highlighter -override shared/cargo/items regions
+add-highlighter -override shared/cargo-share regions
+# shared highlighters
+add-highlighter -override shared/cargo-share/rust region "^[0-9]+ \|" $ ref rust
+add-highlighter -override shared/cargo-share/help region "^\s+\|" $ regions
+add-highlighter -override shared/cargo-share/help/rust region "`" "`" ref rust
+add-highlighter -override shared/cargo-share/help/info default-region group
+add-highlighter -override shared/cargo-share/help/info/help regex "help" 0:default+b
+add-highlighter -override shared/cargo-share/attribute region "#\[" \] ref rust
+# error message
+add-highlighter -override shared/cargo/items/error region "^error" "^\n" group
+add-highlighter -override shared/cargo/items/error/context group
+add-highlighter -override shared/cargo/items/error/error regex "^(error)(?:\[(E[0-9]+)\])?" 1:red+b 2:cyan
+add-highlighter -override shared/cargo/items/error/arrow regex "(?S)(-->) (.+):([0-9]+):([0-9]+)" 1:red 2:default+b 3:cyan 4:cyan
+add-highlighter -override shared/cargo/items/error/context/pointer regex "\s(-+|\^+)\s" 1:red+b
+add-highlighter -override shared/cargo/items/error/context/share ref cargo-share
+# warning message
+add-highlighter -override shared/cargo/items/warning region "^(warning)" "^\n" group
+add-highlighter -override shared/cargo/items/warning/context group
+add-highlighter -override shared/cargo/items/warning/warning regex "^(warning)(?:\[(E[0-9]+)\])?" 1:yellow+b 2:cyan
+add-highlighter -override shared/cargo/items/warning/arrow regex "(?S)(-->) (.+):([0-9]+):([0-9]+)" 1:yellow 2:default+b 3:cyan 4:cyan
+add-highlighter -override shared/cargo/items/warning/context/pointer regex "\s(-+|\^+)\s" 1:yellow+b
+add-highlighter -override shared/cargo/items/warning/context/share ref cargo-share
+# finished message
+add-highlighter -override shared/cargo/items/finished region "^\s+Finished dev" $ group
+add-highlighter -override shared/cargo/items/finished/finished regex "Finished dev" 0:green+b
+add-highlighter -override shared/cargo/items/finished/flags regions
+add-highlighter -override shared/cargo/items/finished/flags/flags region \[ \] group
+add-highlighter -override shared/cargo/items/finished/flags/flags/flag regex '[a-zA-Z0-9_\-]+' 0:cyan
+add-highlighter -override shared/cargo/items/finished/seconds regex "in ([0-9]+\.[0-9]+)s" 1:default+b
+
+declare-option \
+    -docstring "shell command run to build the project" \
+    str cargocmd cargo 
+
+declare-option \
+    -docstring "regex describing cargo error references" \
+    regex cargo_error_pattern \
+    "^\h*(?:error|warning|note)(?:\[[A-Z0-9]+\])?: ([^\n]*)\n *--> ([^\n]*?):(\d+)(?::(\d+))?" 
+
+declare-option -hidden int cargo_current_error_line
+declare-option -hidden str cargo_workspace_root
+
+define-command -params .. \
+    -docstring %{cargo [<arguments>]: cargo utility wrapper
+All the optional arguments are forwarded to the cargo utility} \
+    cargo %{
+    evaluate-commands %sh{
+        workspace_root=$(
+            cargo metadata --format-version=1 |
+            grep -o '"workspace_root":"[^"]*' |
+            grep -o '[^"]*$'
+        )
+        quoted_workspace_root="'""$(
+            printf %s "$workspace_root" |
+            sed -e "s/'/''/g"
+        )""/'"
+
+        output=$(mktemp -d "${TMPDIR:-/tmp}"/kak-cargo.XXXXXXXX)/fifo
+        mkfifo ${output}
+        ( eval ${kak_opt_cargocmd} "$@" > ${output} 2>&1 ) > /dev/null 2>&1 < /dev/null &
+
+        printf %s\\n "
+            evaluate-commands -try-client '$kak_opt_toolsclient' %{
+               edit! -fifo ${output} -scroll *cargo*
+               set-option buffer filetype cargo
+               set-option buffer cargo_current_error_line 1
+               set-option buffer cargo_workspace_root $quoted_workspace_root
+               hook -once buffer BufCloseFifo .* %{
+                   nop %sh{ rm -r $(dirname ${output}) }
+                   evaluate-commands -try-client '$kak_client' %{
+                       echo -- Completed cargo $*
+                   }
+               }
+           }
+        "
     }
 }
 
-map global user k ':lsp-hover<ret>'\
-    -docstring 'Lsp-hover'
-map global user K ':lsp-hover-buffer<ret>'\
-    -docstring 'Lps-info in buffer'
-map global user l ':enter-user-mode lsp<ret>' \
-    -docstring 'Enter lsp-mode'
-map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>'\
-    -docstring 'Select next snippet placeholder'
-map global object f '<a-semicolon>lsp-object Function Method<ret>'\
-    -docstring 'LSP function or method'
-map global object t '<a-semicolon>lsp-object Class Interface Struct<ret>'\
-    -docstring 'LSP class interface or struct'
-map global object d '<a-semicolon>lsp-diagnostic-object --include-warnings<ret>'\
-    -docstring 'LSP errors and warnings'
+hook global WinSetOption filetype=cargo %{
+    add-highlighter window/cargo ref cargo
+    map -docstring "Jump to current error" buffer normal <ret> %{: cargo-jump<ret>} }
+
+hook global WinSetOption filetype=(?!cargo).* %{
+    remove-highlighter window/cargo
+    unmap buffer normal <ret> %{: cargo-jump<ret>} }
+
+declare-option -docstring "name of the client in which all source code jumps will be executed" \
+    str jumpclient
+
+define-command -hidden cargo-open-error -params 4 %{
+    evaluate-commands -try-client %opt{jumpclient} %{
+        edit -existing "%arg{1}" "%arg{2}" "%arg{3}"
+        info -anchor "%arg{2}.%arg{3}" "%arg{4}"
+        try %{ focus } } }
+
+define-command -hidden cargo-jump %{ evaluate-commands %{
+        execute-keys "/" %opt{cargo_error_pattern} <ret>
+        execute-keys <a-/> %opt{cargo_error_pattern} <ret><a-:> "<a-;>"
+        set-option buffer cargo_current_error_line "%val{cursor_line}"
+        cargo-open-error \
+            "%opt{cargo_workspace_root}%reg{2}" \
+            "%reg{3}" \
+            "%sh{ echo ${kak_main_reg_4:-1} }" \
+            "%reg{1}" } }
+
+define-command cargo-next-error -docstring 'Jump to the next cargo error' %{
+    try %{ evaluate-commands -try-client %opt{jumpclient} %{
+            buffer '*cargo*'
+            execute-keys "%opt{cargo_current_error_line}gl" "/%opt{cargo_error_pattern}<ret>"
+            cargo-jump }
+        try %{ evaluate-commands -client %opt{toolsclient} %{
+                buffer '*cargo*'
+                execute-keys %opt{cargo_current_error_line}gvv } }
+    } catch %{ fail "No Cargo errors found" } }
+
+define-command cargo-previous-error -docstring 'Jump to the previous cargo error' %{
+    try %{ evaluate-commands -try-client %opt{jumpclient} %{
+            buffer '*cargo*'
+            execute-keys "%opt{cargo_current_error_line}gl" "<a-/>%opt{cargo_error_pattern}<ret>"
+            cargo-jump }
+        try %{ evaluate-commands -client %opt{toolsclient} %{
+                buffer '*cargo*'
+                execute-keys %opt{cargo_current_error_line}gvv } }
+    } catch %{ fail "No Cargo errors found" } }
 
 #------------------------------------------------------------------------------
+# lsp -------------------------------------------------------------------------
+
+# evaluate-commands %sh{ kak-lsp --kakoune -s $kak_session }
+#     hook global WinSetOption filetype=(rust|python|lua|sh|c) %{
+#     lsp-enable-window
+#     set-option global lsp_diagnostic_line_error_sign 'E'
+#     set-option global lsp_diagnostic_line_warning_sign 'W'
+#     set-option global lsp_diagnostic_line_info_sign 'I'
+#     set-option global lsp_diagnostic_line_hint_sign 'H'
+#     set-option global lsp_hover_anchor false
+                #     set-option global lsp_insert_spaces true
+#     set-option global lsp_config %{
+#         [language.rust.settings.rust-analyzer.check]
+#         command = "clippy"
+#     }
+# }
+
+# map global user k ':lsp-hover<ret>'\
+#     -docstring 'Lsp-hover'
+# map global user K ':lsp-hover-buffer<ret>'\
+#     -docstring 'Lps-info in buffer'
+# map global user l ':enter-user-mode lsp<ret>' \
+#     -docstring 'Enter lsp-mode'
+# map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>'\
+#     -docstring 'Select next snippet placeholder'
+# map global object f '<a-semicolon>lsp-object Function Method<ret>'\
+#     -docstring 'LSP function or method'
+# map global object t '<a-semicolon>lsp-object Class Interface Struct<ret>'\
+#     -docstring 'LSP class interface or struct'
+# map global object d '<a-semicolon>lsp-diagnostic-object --include-warnings<ret>'\
+#     -docstring 'LSP errors and warnings'
+
