@@ -13,7 +13,7 @@ SCOPE = "buffer"
 MODE = "insert"
 
 
-def langmap_extention():
+def main():
     if len(sys.argv) < 2:
         print(
             "fail Wrong argument count! Usage: <current langmap> <alt langmap> <client>"
@@ -50,4 +50,4 @@ def langmap_extention():
 
 
 if __name__ == "__main__":
-    langmap_extention()
+    main()

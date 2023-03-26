@@ -1,8 +1,5 @@
-#!/bin/env python3
+#!/bin/env python
 
-# import os
-
-# Opts
 default = "default"
 g = "g"
 b = "b"
@@ -11,9 +8,8 @@ i = "i"
 c = "c"
 u = "u"
 
-colorscheme_name = "gbl"
+colorscheme_name = "gruv-light"
 
-# Palette
 bg0 = "#fbf1c7"
 bg1 = "#ebdbb2"
 bg2 = "#d5c4a1"
@@ -44,7 +40,7 @@ orange1 = "#af3a03"
 gruvbox_light = {
     # Builtins
     "Default": [fg1, bg0],
-    "PrimarySelection": [default, bg4, g],
+    "PrimarySelection": [default, bg2, g],
     "SecondarySelection": [default, bg3, g],
     "PrimaryCursor": [bg0, blue1, g],
     "PrimaryCursorEol": [bg0, blue1, g],
