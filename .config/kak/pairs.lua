@@ -5,8 +5,8 @@ OPEN        = { "(", "[", "<", '"', "{", "'" }
 CLOSE       = { ")", "]", ">", '"', "}", "'" }
 
 function pair_item(item)
-	for idx, open_ch in ipairs(OPEN) do
-		if item == open_ch or item == OPEN_LETTER[idx] then
+	for idx = 1, #OPEN do
+		if item == OPEN[idx] or item == OPEN_LETTER[idx] then
 			local left = OPEN[idx]
 			local right = CLOSE[idx]
 			return { left, right }
