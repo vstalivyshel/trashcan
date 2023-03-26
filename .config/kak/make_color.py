@@ -1,5 +1,6 @@
 #!/bin/env python3
-import os
+
+# import os
 
 # Opts
 default = "default"
@@ -111,8 +112,7 @@ gruvbox_light = {
     "list": [fg0],
 }
 
-colorscheme_path = os.getenv(
-    "HOME") + f"/.config/kak/colors/{colorscheme_name}.kak"
+colorscheme_path = f"/home/vstalivyshel/.config/kak/colors/{colorscheme_name}.kak"
 open(colorscheme_path, "w").close()
 
 
@@ -141,5 +141,5 @@ def main():
             f.write(echo_face)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
