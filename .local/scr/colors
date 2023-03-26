@@ -1,0 +1,33 @@
+#!/bin/env bash
+
+# kakoune
+themes=( "gruv-light" "rose-pine-moon" "rose-pine-dawn" "rose-pine" "kanagawa" )
+
+choices=""
+for theme in "${themes[@]}"; do
+  choices+="$theme\n"
+done
+
+selected_theme=$(printf "$choices" | fzf)
+
+if [[ -z $selected_theme ]]; then
+    exit 0
+fi
+
+kakoune="$HOME/.config/kak/kakrc"
+ala_path="$HOME/.config/alacritty"
+ala="$ala_path/alacritty.yml"
+
+
+katalk "colorscheme $selected_theme"
+
+if [[ -f "$ala" ]]; then
+    sed -i "s#- /.*#- $ala_path/$selected_theme.yml#" "$ala"
+fi
+
+ # sed -i "s#- ~/*#some#" ./alacritty.yml
+
+if [[ -f "$kakoune" ]]; then
+    sed -i "s/^colorscheme.*/colorscheme $selected_theme/" "$kakoune"
+fi
+

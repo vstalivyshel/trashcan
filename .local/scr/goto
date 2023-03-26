@@ -1,0 +1,29 @@
+#!/bin/env bash
+
+dirs="$HOME/.local/scr "
+dirs+="$HOME/.config "
+dirs+="$HOME/Downloads "
+dirs+="$HOME/HoneyBunny/storagefile "
+dirs+="$HOME/HoneyBunny "
+
+selected=$(find $dirs -maxdepth 1 -type d | fzf)
+
+if [[ -z "$selected" ]]; then
+    exit 0
+fi
+
+builtin cd "$selected" || return
+
+if [[ "$EDITOR" == *"kak"* ]]; then
+    session_name=$(basename "$PWD" | tr "." "_")
+    socket_name=$(kak -l | grep "$session_name")
+
+    if [[ -z "$socket_name" ]]; then
+        setsid kak -d -s "$session_name" &
+        sleep 0.05
+    fi
+
+    kak -c "$session_name"
+else
+    "$EDITOR"
+fi
