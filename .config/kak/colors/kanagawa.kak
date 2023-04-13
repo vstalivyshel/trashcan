@@ -1,113 +1,61 @@
-# Thanks to https://github.com/helix-editor/helix/blob/master/runtime/themes/kanagawa.toml
-# And to https://github.com/catppuccin/kakoune
-# And to https://github.com/rebelot/kanagawa.nvim
-
-declare-option -hidden str seaFoam                 "rgb:C7CCD1" # custom lighter foreground
-declare-option -hidden str fujiWhite               "rgb:DCD7BA" # default foreground
-declare-option -hidden str oldWhite                "rgb:C8C093" # dark foreground, e.g. statuslines
-declare-option -hidden str sumiInk0                "rgb:16161D" # dark background, e.g. statuslines, floating windows
-declare-option -hidden str sumiInk1                "rgb:1F1F28" # default background
-declare-option -hidden str sumiInk2                "rgb:2A2A37" # lighter background, e.g. colorcolumns, folds
-declare-option -hidden str sumiInk3                "rgb:363646" # lighter background, e.g. cursorline
-declare-option -hidden str sumiInk4                "rgb:54546D" # darker foreground, e.g. linenumbers, fold column
-declare-option -hidden str waveBlue1               "rgb:223249" # popup background, visual selection background
-declare-option -hidden str waveBlue2               "rgb:2D4F67" # popup selection background, search background
-declare-option -hidden str winterGreen             "rgb:2B3328" # diff add background
-declare-option -hidden str winterYellow            "rgb:49443C" # diff change background
-declare-option -hidden str winterRed               "rgb:43242B" # diff deleted background
-declare-option -hidden str winterBlue              "rgb:252535" # diff line background
-declare-option -hidden str autumnGreen             "rgb:76946A" # git add
-declare-option -hidden str autumnRed               "rgb:C34043" # git delete
-declare-option -hidden str autumnYellow            "rgb:DCA561" # git change
-declare-option -hidden str samuraiRed              "rgb:E82424" # diagnostic error
-declare-option -hidden str roninYellow             "rgb:FF9E3B" # diagnostic warning
-declare-option -hidden str waveAqua1               "rgb:6A9589" # diagnostic info
-declare-option -hidden str dragonBlue              "rgb:658594" # diagnostic hint
-declare-option -hidden str fujiGray                "rgb:727169" # comments
-declare-option -hidden str springViolet1           "rgb:938AA9" # light foreground
-declare-option -hidden str oniViolet               "rgb:957FB8" # statements and keywords
-declare-option -hidden str crystalBlue             "rgb:7E9CD8" # functions and titles
-declare-option -hidden str springViolet2           "rgb:9CABCA" # brackets and punctuation
-declare-option -hidden str springBlue              "rgb:7FB4CA" # specials and builtins
-declare-option -hidden str lightBlue               "rgb:A3D4D5" # not used!
-declare-option -hidden str waveAqua2               "rgb:7AA89F" # types
-declare-option -hidden str springGreen             "rgb:98BB6C" # strings
-declare-option -hidden str boatYellow1             "rgb:938056" # not used
-declare-option -hidden str boatYellow2             "rgb:C0A36E" # operators, regex
-declare-option -hidden str carpYellow              "rgb:E6C384" # identifiers
-declare-option -hidden str sakuraPink              "rgb:D27E99" # numbers
-declare-option -hidden str waveRed                 "rgb:E46876" # standout specials 1, e.g. builtin variables
-declare-option -hidden str peachRed                "rgb:FF5D62" # standout specials 2, e.g. exception handling, returns
-declare-option -hidden str surimiOrange            "rgb:FFA066" # constants, imports, booleans
-declare-option -hidden str katanaGray              "rgb:717C7C" # deprecated
-
-# Markup
-set-face	global	title				   "%opt{springViolet2}"
-set-face	global	header				   "%opt{surimiOrange}+b"
-set-face	global	bold				   "%opt{fujiWhite}+b"
-set-face	global	italic				   "%opt{fujiWhite}+i"
-set-face	global	mono				   "%opt{fujiWhite}"
-set-face	global	block				   "%opt{fujiWhite}"
-set-face	global	link				   "%opt{springBlue}+c"
-set-face	global	bullet				   "%opt{springViolet1}"
-set-face	global	list				   "%opt{sakuraPink}"
-
-# Builtins
-set-face	global	Default				   "%opt{fujiWhite},%opt{sumiInk1}"
-set-face	global	PrimarySelection	   "default,%opt{sumiInk3}+g"
-set-face	global	SecondarySelection	   "default,%opt{sumiInk2}+g"
-set-face	global	PrimaryCursor		   "%opt{sumiInk1},%opt{fujiWhite}+g"
-set-face	global	SecondaryCursor		   "%opt{sumiInk1},%opt{waveAqua1}+g"
-set-face	global	PrimaryCursorEol	   "%opt{sumiInk1},%opt{fujiWhite}+g"
-set-face	global	SecondaryCursorEol	   "%opt{sumiInk1},%opt{waveAqua2}+g"
-set-face	global	LineNumbers			   "%opt{sumiInk4},%opt{sumiInk1}"
-set-face	global	LineNumberCursor	   "%opt{roninYellow},%opt{sumiInk1}+b"
-set-face	global	LineNumbersWrapped	   "%opt{sumiInk4},%opt{sumiInk1}"
-set-face	global	MenuForeground 		   "%opt{fujiWhite},%opt{sumiInk2}+b"
-set-face	global	MenuBackground		   "%opt{fujiWhite},%opt{sumiInk0}"
-set-face	global	MenuInfo			   "%opt{crystalBlue},%opt{sumiInk0}"
-set-face	global	Information			   "%opt{fujiWhite},%opt{sumiInk0}"
-set-face	global	Error				   "%opt{sumiInk0},%opt{waveRed}"
-set-face	global	StatusLine			   "%opt{oldWhite},%opt{sumiInk0}"
-set-face	global	StatusLineMode		   "%opt{sumiInk0},%opt{crystalBlue}"
-set-face	global	StatusLineInfo		   "%opt{oldWhite},%opt{sumiInk0}"
-set-face	global	StatusLineValue		   "%opt{sumiInk0},%opt{autumnGreen}"
-set-face	global	StatusCursor		   "%opt{sumiInk0},%opt{fujiWhite}"
-set-face	global	Prompt				   "%opt{sumiInk0},%opt{autumnGreen}"
-set-face	global	MatchingChar		   "%opt{waveRed},%opt{sumiInk1}+b"
-set-face	global	Whitespace			   "%opt{fujiWhite},%opt{sumiInk1}+f"
-set-face	global	WrapMarker			   Whitespace
-set-face	global	BufferPadding		   "%opt{sumiInk4},%opt{sumiInk1}"
-
-# Code
-set-face	global	value				   "%opt{carpYellow}"
-set-face	global	type				   "%opt{waveAqua2}"
-set-face	global	variable			   "%opt{fujiWhite}"
-set-face	global	module				   "%opt{surimiOrange}"
-set-face	global	function			   "%opt{crystalBlue}"
-set-face	global	string				   "%opt{springGreen}"
-set-face	global	keyword				   "%opt{oniViolet}"
-set-face	global	operator			   "%opt{springViolet2}"
-set-face	global	attribute			   "%opt{waveRed}"
-set-face	global	comment				   "%opt{fujiGray}"
-set-face	global	documentation		   comment
-set-face	global	meta				   "%opt{peachRed}"
-set-face	global	builtin				   "%opt{waveRed}+b"
-
-# Lsp
-set-face    global  DiagnosticError        "%opt{samuraiRed}" 
-set-face    global  DiagnosticWarning      "%opt{roninYellow}"
-set-face    global  DiagnosticHint         "%opt{dragonBlue}"
-set-face    global  DiagnosticInfo         "%opt{waveAqua1}"
-set-face    global  LineFlagError          "%opt{samuraiRed}" 
-set-face    global  LineFlagWarning        "%opt{roninYellow}"
-set-face    global  LineFlagHint           "%opt{dragonBlue}"
-set-face    global  LineFlagInfo           "%opt{waveAqua1}"
-set-face    global  InlayDiagnosticError   "%opt{samuraiRed}" 
-set-face    global  InlayDiagnosticWarning "%opt{roninYellow}"
-set-face    global  InlayDiagnosticHint    "%opt{dragonBlue}"
-set-face    global  InlayDiagnosticInfo    "%opt{waveAqua1}"
-set-face    global  InlayCodeLens          "%opt{waveAqua1}"
-set-face    global  InlayHint              "%opt{waveAqua1}"
-
-
+face global string "rgb:98BB6C"
+face global builtin "rgb:E46876+b"
+face global DiagnosticError "rgb:E82424"
+face global DiagnosticWarning "rgb:FF9E3B"
+face global DiagnosticHint "rgb:658594"
+face global DiagnosticInfo "rgb:6A9589"
+face global LineFlagError "rgb:E82424"
+face global LineFlagWarning "rgb:FF9E3B"
+face global type "rgb:7AA89F"
+face global LineFlagInfo "rgb:6A9589"
+face global InlayDiagnosticError "rgb:E82424"
+face global InlayDiagnosticWarning "rgb:FF9E3B"
+face global InlayDiagnosticHint "rgb:658594"
+face global function "rgb:7E9CD8"
+face global InlayCodeLens "rgb:6A9589"
+face global InlayHint "rgb:6A9589"
+face global title "rgb:9CABCA"
+face global header "rgb:FFA066+b"
+face global bold "rgb:DCD7BA+b"
+face global italic "rgb:DCD7BA+i"
+face global mono "rgb:DCD7BA"
+face global block "rgb:DCD7BA"
+face global link "rgb:7FB4CA+c"
+face global InlayDiagnosticInfo "rgb:6A9589"
+face global bullet "rgb:938AA9"
+face global list "rgb:D27E99"
+face global LineFlagHint "rgb:658594"
+face global meta "rgb:FF5D62"
+face global SecondarySelection "default,rgb:2A2A37+g"
+face global LineNumbersWrapped "rgb:54546D,rgb:1F1F28"
+face global attribute "rgb:E46876"
+face global SecondaryCursorEol "rgb:1F1F28,rgb:7AA89F+g"
+face global Default "rgb:DCD7BA,rgb:1F1F28"
+face global InsertCursor "rgb:1F1F28,rgb:76946A+b"
+face global SecondaryCursor "rgb:1F1F28,rgb:6A9589+g"
+face global PrimarySelection "default,rgb:363646+g"
+face global LineNumbers "rgb:54546D,rgb:1F1F28"
+face global LineNumberCursor "rgb:FF9E3B,rgb:1F1F28+b"
+face global PrimaryCursor "rgb:1F1F28,rgb:DCD7BA+g"
+face global MenuForeground "rgb:16161D,rgb:C8C093+b"
+face global MenuBackground "rgb:C8C093,rgb:16161D"
+face global MenuInfo "MenuBackground"
+face global Information "MenuBackground"
+face global Error "rgb:16161D,rgb:E46876"
+face global StatusLine "Default"
+face global StatusLineMode "Prompt"
+face global Prompt "rgb:16161D,rgb:76946A"
+face global StatusLineInfo "StatusLine"
+face global StatusLineValue "StatusLine"
+face global StatusCursor "PrimaryCursor"
+face global MatchingChar "rgb:FF9E3B,rgb:1F1F28+b"
+face global Whitespace "rgb:DCD7BA,rgb:1F1F28+f"
+face global PrimaryCursorEol "rgb:1F1F28,rgb:DCD7BA+g"
+face global WrapMarker "Whitespace"
+face global BufferPadding "rgb:54546D,rgb:1F1F28"
+face global value "rgb:E6C384"
+face global variable "rgb:DCD7BA"
+face global keyword "rgb:957FB8+b"
+face global operator "rgb:9CABCA"
+face global module "rgb:FFA066"
+face global comment "rgb:727169"

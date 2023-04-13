@@ -1,7 +1,7 @@
 #!/bin/env bash
 
 # kakoune
-themes=( "gruv-light" "rose-pine-moon" "rose-pine-dawn" "rose-pine" "kanagawa" )
+themes=( "gruv-light" "rose-pine-moon" "rose-pine-dawn" "rose-pine" "kanagawa" "lotus")
 
 choices=""
 for theme in "${themes[@]}"; do

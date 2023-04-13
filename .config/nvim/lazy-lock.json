@@ -1,8 +1,9 @@
 {
-  "kanagawa.nvim": { "branch": "master", "commit": "d8800c36a7f3bcec953288926b00381c028ed97f" },
-  "lazy.nvim": { "branch": "main", "commit": "8456a867f79e3fb3b5390659c5d11a1e35793372" },
-  "nvim-autopairs": { "branch": "master", "commit": "e755f366721bc9e189ddecd39554559045ac0a18" },
+  "gruvbox.nvim": { "branch": "main", "commit": "046bd22cc704fef4f19d6a9320fc27bf4527479f" },
+  "kanagawa.nvim": { "branch": "master", "commit": "3c87bfacd5f51033bbeeb04f837c88f94861f6af" },
+  "lazy.nvim": { "branch": "main", "commit": "57cce98dfdb2f2dd05a0567d89811e6d0505e13b" },
+  "nvim-autopairs": { "branch": "master", "commit": "0fd6519d44eac3a6736aafdb3fe9da916c3701d4" },
   "nvim-colorizer.lua": { "branch": "master", "commit": "36c610a9717cc9ec426a07c8e6bf3b3abcb139d6" },
-  "oil.nvim": { "branch": "master", "commit": "4b05ebdf202bf61ce240f40558822fe5564d02ea" },
-  "rose-pine": { "branch": "main", "commit": "1883d8b417403f1d8c56d52d90445bbbe6be4b80" }
+  "oil.nvim": { "branch": "master", "commit": "5edf9784a5ab536dcdcdae5cc8d75a307863d529" },
+  "rose-pine": { "branch": "main", "commit": "f8e210df52a4f418eae3690eb744b06c13a6c556" }
 }

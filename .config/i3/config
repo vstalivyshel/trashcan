@@ -102,10 +102,10 @@ bindsym $mod+w layout tabbed
 bindsym $mod+e layout toggle split
 
 # toggle tiling / floating
-bindsym $mod+space floating toggle
+bindsym $mod+shift+space floating toggle
 
 # change focus between tiling / floating windows
-bindsym $mod+shift+space focus mode_toggle
+bindsym $mod+space focus mode_toggle
 
 # focus the parent container
 bindsym $mod+a focus parent
@@ -195,8 +195,12 @@ bindsym $mod+Shift+Home exec systemctl reboot
 bindsym $mod+Shift+End exec systemctl poweroff -i
 
 focus_follows_mouse no
-
-for_window [class="^.*"] border pixel 3
 hide_edge_borders smart
 
-exec --no-startup-id i3-msg "workspace 1; exec $term"
+for_window [class="^.*"] border pixel 3
+
+assign [class="firefox"] 1
+
+exec --no-startup-id firefox
+exec --no-startup-id workspace 2; $term -e tmux
+

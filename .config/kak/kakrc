@@ -1,48 +1,46 @@
-colorscheme gruv-light
+colorscheme lotus
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
-# TODO : surf.py -> check oil.nvim
-# TODO : prompt me to close multiple buffers and update the list of them
-# TODO : zen-mode using tmux panes (maybe)
+declare-option -hidden str glua "%val{config}/glua"
 
-map global insert '<c-^>' '<a-;>:toggle-langmap<ret>'
-add-highlighter -override global/ number-lines -relative -hlcursor -separator '  '
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+add-highlighter -override global/ number-lines -relative -hlcursor -separator ' '
+add-highlighter -override global/ show-matching 
 set-option global ui_options terminal_assistant=none
-# set-option global autoinfo command
 set-option global tabstop 4
 set-option global scrolloff 15,0
 set-option global startup_info_version 999999999
+set global autocomplete prompt
+
+hook global -group insert-color ModeChange .*:.*:insert %{
+    set-face window PrimaryCursor InsertCursor
+    set-face window PrimaryCursorEol InsertCursor
+}
+hook global -group insert-color ModeChange .*:insert:.* %{ try %{
+    unset-face window PrimaryCursor
+    unset-face window PrimaryCursorEol 
+} }
 
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
-map global goto s '<esc>:echo sasha<ret>'
-
-map global insert <c-w> '<a-;>b<a-;>"_d'
+map global insert <c-w> '<a-;>h<a-;>b<a-;>"_d'
 map global insert <c-h> <backspace>
 map global insert <c-b> '<left>'
 map global insert <c-f> '<right>'
 map global insert <c-a> '<a-;>gi'
 map global insert <c-e> '<a-;>gl<a-;>l'
-
-evaluate-commands %sh{
-    keys=( "h" "j" "k" "l" )
-    keys+=( "O" "o" "A" "I" )
-    keys+=( "t" "f" "g" "]" "[" )
-    keys+=("b" "w" "e" )
-    keys+=( "x" "X" )
-    keys+=( "d" )
-    for k in "${keys[@]}"; do
-    	printf %s "map global insert <a-$k> '<esc>$k' ;"
-    done
-}
-
 map global insert <a-,> '<a-;><'
 map global insert <a-.> '<a-;>>'
-map global normal \' '<a-z>a<a-(>'
+map global insert <c-d> '<a-;>;<a-;>"_d'
+map global normal D '<a-z>a<a-(>'
 map global normal X 'x_'
 map global normal '#' ':comment-line<ret>'
+map global normal . '<a-.>'
+map global normal <a-.> '.'
 
 map global user w ":w<ret>" \
     -docstring 'Save'
@@ -50,6 +48,10 @@ map global user ';' 'y:<c-r>"<ret>' \
     -docstring 'Push selected into cmd'
 map global user ':' 'y:<c-r>"<ret>' \
     -docstring 'Push selected into cmd for all sessions'
+
+# hook buffer -group testing NormalKey '.*' %{
+#     echo %val{hook_param}
+# }
 
 # clipboard
 map global user y '<a-|>xsel --input --clipboard<ret>'\
@@ -59,33 +61,34 @@ map global user P '!xsel --output --clipboard<ret>'\
 map global user p '<a-!>xsel --output --clipboard<ret>'\
     -docstring 'Paste before a seletction from the system clipboard'
 
-#------------------------------------------------------------------------------
-# file browser  ---------------------------------------------------------------
-
-declare-option -hidden str list_here 'ls -AhFl'
-
-define-command cd-or-edit -hidden -override -params 1 \
-%{ try %{ edit -existing %arg{1}  } catch %{
-    change-directory %arg{1}
-    execute-keys -draft '%d!ls -AhFlg --group-directories-first<ret>'
-} }
-
-# TODO : send this shit to python
-define-command surf -override \
-%{ declare-option -hidden str starting_point %val{client_env_PWD} 
-    try %{ delete-buffer! *surf* }
-    edit -scratch *surf*
-	execute-keys -draft '!ls -AhFlg --group-directories-first<ret>'
-	map buffer normal <ret> 'gl<a-b>_S\*<ret>:cd-or-edit %val{selection}<ret>'
-	map buffer goto b '<esc>:cd ..<ret>%d!ls -AhFlg --group-directories-first<ret>;' \
-    	-docstring 'Cd into parent directory'
-	map buffer goto h '<esc>:cd %opt{starting_point}<ret>%d!ls -AhFlg --group-directories-first<ret>;' \
-    	-docstring 'Go back to the starting point'
-	map buffer goto H '<esc>:cd /home/vstalivyshel/<ret>%d!ls -AhFlg --group-directories-first<ret>;' \
-    	-docstring 'Go home'
-	# need hook: cd back to starting_point after swithcing buffer
+evaluate-commands %sh{
+    keys=( "h" "j" "k" "l"  "H" "J" "K" "L" )
+    keys+=("o" "I" "O" "A" )
+    keys+=("t" "T" "f" "F" "g" "G" "]" "[" )
+    keys+=("b" "w" "e"  "B" "W" "E" )
+    keys+=("x" "X")
+    keys+=("c" "C" "d")
+    keys+=("m" "M" "n" "N")
+    cmd=""
+    for k in "${keys[@]}"; do
+        cmd+="map global insert <a-$k> '<esc>$k' ; "
+	done
+	printf %s "eval %{ $cmd }"
 }
 
+#------------------------------------------------------------------------------
+# colors ----------------------------------------------------------------------
+
+define-command make-color-current-file -override -command-completion %{
+eval -client %val{client} %sh{
+    file="$kak_opt_filetype"
+    if [ $file != "lua" ]; then
+        printf %s "fail you are not in lua color file!"
+    else
+        "$kak_opt_glua/lua_colors/make_color.lua" "$kak_buffile" "$kak_config/colors"
+    fi 
+} }
+map global user M ':make-color-current-file<ret>'
 
 #------------------------------------------------------------------------------
 # splits ----------------------------------------------------------------------
@@ -117,6 +120,170 @@ map global window-mode s ":buf-hsplit<ret>" \
 map global window-mode t ":buf-tab<ret>" \
     -docstring 'Open current buffer in new tab'
 
+
+# ------------------------------------------------------------------------------
+# auto-pairs--------------------------------------------------------------------
+
+hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' \
+%{ evaluate-commands -save-regs 'c' %{
+        execute-keys  '<a-;>h'
+        set-register 'c' %sh{ "$kak_opt_glua/pairs.lua" "$kak_selection" r}
+        execute-keys -itersel '<a-;>;<a-;>"cp'
+    }
+    hook window -group insert-newline -once InsertChar '\n' %{
+    execute-keys "<a-;>;<ret><esc>KK<a-&>j<a-gt>"
+       execute-keys -with-hooks A
+    }
+    hook window -group auto-pairs -once InsertChar '[^\n]' %{
+        remove-hooks window insert-newline  
+    }
+    hook window -group auto-pairs -once ModeChange pop:insert:.* %{
+        remove-hooks window insert-newline
+    } 
+}
+
+# declare-user-mode surround
+
+# define-command -hidden -override surround-selection -params 1..2  %{
+# 	evaluate-commands -save-regs 'rl' %sh{
+#     	pairs="$kak_opt_pairs"
+#     	r=$("$pairs" "$1" "r$2")
+#     	l=$("$pairs" "$1" "l$2")
+#     	printf %s "set-register r %{$r} ; set-register l %{$l}"
+# 	}
+# 	exec 
+# }
+
+# map global normal \' ":enter-user-mode surround<ret>"
+# map global surround \' 
+
+#------------------------------------------------------------------------------
+# little helper----------------------------------------------------------------
+
+define-command auto-info \
+-docstring 'command|onkey|normal' \
+-override \
+-params 1 \
+%{ set buffer autoinfo %arg{@} }
+
+define-command kak-talk \
+-docstring 'Send a kakoune command to the all sessions' \
+-override \
+-command-completion \
+-params .. \
+ %{ nop %sh{ katalk $@ } }
+alias global kak kak-talk 
+
+define-command find-file \
+-docstring 'Fuzzy search for the files'\
+-override \
+%{ prompt  -menu \
+	-shell-script-candidates %{fd -tf -E "colors/*.kak"} \
+    'File: '  %{ try %{ edit -existing %val{text} } }
+}
+map global user f ':find-file<ret>' \
+    -docstring 'Search for the file'
+
+define-command find-buffer \
+-docstring 'Open an exising buffer' \
+-override \
+%{ prompt -menu -buffer-completion 'Buffer: ' 'buffer %val{text}' }
+map global user b ':find-buffer<ret>' \
+    -docstring 'Serch for the active buffers'
+
+define-command ls \
+-docstring 'List files in the current directory' \
+-override \
+%{ info -title "%val{buffile}" %sh{ ls -Alh } }
+map global normal <c-g> ":ls<ret>"
+
+define-command sh \
+-override \
+-file-completion \
+-params 1.. \
+%{ echo %sh{ "$@" } }
+
+define-command close-buffers \
+-override \
+-buffer-completion \
+-params 1.. \
+%{ evaluate-commands %sh{
+    for b in "$@"; do
+		echo "db %{$b} ; "
+    done
+} }
+
+define-command set-filetype \
+-docstring 'Set a filetype for current buffer' \
+-override \
+-params 1 \
+%{ set-option current filetype %arg{1} }
+alias global lang set-filetype
+
+define-command new-file \
+-docstring 'Create a new file(s)'\
+-override \
+-params 1.. \
+%{ echo %sh{ touch "$@" }; edit %arg{1} }
+alias global nf new-file
+
+
+#------------------------------------------------------------------------------
+# langmap ---------------------------------------------------------------------
+
+declare-option str def_langmap "en"
+declare-option str alt_langmap "ru"
+declare-option str current_langmap %opt{def_langmap}
+declare-option str langmap_me "%opt{glua}/langmap.py"
+
+set-option global modelinefmt \
+'%val{bufname} %val{cursor_line}:%val{cursor_char_column} 
+{{context_info}} {{mode_info}} - %val{client}@[%val{session}] - (%opt{current_langmap})'
+
+define-command toggle-langmap \
+-override \
+%{ evaluate-commands %sh{
+    current=
+    def="$kak_opt_def_langmap"
+    alt="$kak_opt_alt_langmap"
+    case "$kak_opt_current_langmap" in
+"$def") current="$alt" ;;
+        "$alt") current="$def" ;;
+    esac
+    "$kak_opt_langmap_me" "$kak_opt_current_langmap" "$kak_opt_alt_langmap"
+    echo "set buffer current_langmap $current"
+} }
+map global insert '<c-^>' '<a-;>:toggle-langmap<ret>'
+
+#------------------------------------------------------------------------------
+# Autosave
+define-command enable-auto-save -override  %{ 
+hook buffer -group auto-save NormalKey 'c|(?i)(d|p|u|r)' \
+    %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
+hook buffer -group auto-save ModeChange '.*:.*:insert' \
+    %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
+hook buffer -group auto-save ModeChange '.*:insert:.*' \
+    %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
+}
+def disable-auto-save -override %{ rmhooks buffer auto-save }
+
+#------------------------------------------------------------------------------
+# Fromat
+hook global WinSetOption filetype=(rust|lua|python) \
+ %{ evaluate-commands %sh{
+     fmt_cmd=
+     case "$kak_opt_filetype" in
+         "rust") fmt_cmd="rustfmt" ;;
+         "lua") fmt_cmd="stylua" ;;
+         "python") fmt_cmd="black" ;;
+     esac
+     if ! type "$fmt_cmd" &> /dev/null; then
+     	printf %s "fail Install $fmt_cmd for $kak_buffile"
+ 	else
+         printf %s "set window formatcmd '$fmt_cmd $kak_buffile'"
+     fi
+ } }
+
 #------------------------------------------------------------------------------
 # code-runner -----------------------------------------------------------------
  
@@ -136,7 +303,7 @@ define-command change-exec-pos \
 	echo "NEW POS: %opt{run_pos}"
 }
 map global user s ':change-exec-pos<ret>' \
-    -docstring 'Switch run-code command position'
+    -docstring 'Switch run-code split position'
 
 declare-option str runcmd
 
@@ -150,7 +317,7 @@ define-command run-code \
         "lua") execute="lua $code" ;;
         "python") execute="python $code" ;;
         "sh") execute="bash $code" ;;
-        "rust") execute="cargo run --"  ;;
+        "rust") execute="cargo run"  ;;
     esac
     tmux splitw -"$kak_opt_run_pos" "$execute $@ ; $SHELL"
 } }
@@ -161,266 +328,3 @@ define-command -hidden run-code-with-args \
     %{ prompt 'Args to code: ' %{ run-code %val{text} }  }
 map global user R ':run-code-with-args<ret>' \
     -docstring 'Execute current file with given args'
-
-# ------------------------------------------------------------------------------
-# surround ---------------------------------------------------------------------
-
-declare-option -hidden str close_this 
-
-declare-user-mode surround-mode
-
-map global normal \' \
-    ':enter-user-mode surround-mode<ret>' \
-    -docstring 'Surround selection with single quotes'
-map global surround-mode \" \
-    '<a-;>:set global close_this Q ; surround-selection<ret>' \
-    -docstring 'Surround selection with double quotes'
-map global surround-mode \' \
-    '<a-;>:set global close_this q ; surround-selection<ret>' \
-    -docstring 'Surround selection with single quotes'
-map global surround-mode ( \
-    '<a-;>:set global close_this b ; surround-selection<ret>' \
-    -docstring 'Surround selection with "("'
-map global surround-mode [ \
-    '<a-;>:set global close_this r ; surround-selection<ret>' \
-    -docstring 'Surround selection with "["'
-map global surround-mode { \
-    '<a-;>:set global close_this B ; surround-selection<ret>' \
-    -docstring 'Surround selection with "{"'
-map global surround-mode < \
-    '<a-;>:set global close_this a ; surround-selection<ret>' \
-    -docstring 'Surround selection with "<"'
-map global surround-mode c \
-    '<a-;>:custom-surround-selection<ret>' \
-    -docstring 'Surround selection with custom pairs'
-
-define-command surround-selection -hidden -override \
-%{ evaluate-commands -itersel -save-regs 'rlz' %{
-		set-register 'l' %sh{ $kak_config/pairs.lua "$kak_opt_close_this" -l }
-		set-register 'r' %sh{ $kak_config/pairs.lua "$kak_opt_close_this" -r }
-		execute-keys '_'
-		execute-keys -draft '"lP'  
-		execute-keys -draft '"rp'  
-} }
-
-define-command custom-surround-selection -hidden -override \
-%{ prompt 'Custom surroundings: ' %{
-	set-option global close_this %val{text}
-	surround-selection
-} }
-
-# ------------------------------------------------------------------------------
-# auto-pairs--------------------------------------------------------------------
-
-hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' \
-%{ evaluate-commands -save-regs 'c' -itersel %{
-        execute-keys  '<a-;>h'
-        set-register 'c' %sh{ $kak_config/pairs.lua "$kak_selection" -r}
-        execute-keys -itersel '<a-;>;<a-;>"cp'
-    }
-    hook window -group insert-newline -once InsertChar '\n' %{
-    execute-keys "<a-;>;<ret><esc>KK<a-&>j<a-gt>"
-       execute-keys -with-hooks A
-    }
-    hook window -group auto-pairs -once InsertChar '[^\n]' %{
-        remove-hooks window insert-newline  
-    }
-    hook window -group auto-pairs -once ModeChange pop:insert:.* %{
-        remove-hooks window insert-newline
-    } 
-}
-
-#------------------------------------------------------------------------------
-# little helper----------------------------------------------------------------
-
-define-command auto-info \
--docstring 'command|onkey|normal' \
--override \
--params 1 \
-%{ set buffer autoinfo %arg{@} }
-
-define-command todo \
--docstring 'Open a todo file' \
--override \
-%{
-    declare-option -hidden str todofile \
-        "/home/vstalivyshel/HoneyBunny/Notes/.todo.md"
-    echo %sh{
-        todo_file="$kak_opt_todofile"
-        if ![ -f "$todo_file" ]; then
-            touch "$todo_file"
-        fi
-    }
-    edit %opt{todofile}
-    enable-auto-save
-    set-option buffer filetype markdown
-}
-
-map global user t ':todo<ret>' \
-    -docstring 'Open todo-file'
-
-define-command kak-talk \
--docstring 'Send a kakoune command to the all sessions' \
--override \
--command-completion \
--params .. \
- %{ nop %sh{ katalk $@ } }
-alias global kak kak-talk 
-
-define-command toggle-auto-save -override \
-%{ declare-option -hidden bool auto_save_status false
-    evaluate-commands %sh{
-        case "$kak_opt_auto_save_status" in
-        false) printf %s "
-    		hook buffer -group autosave NormalIdle .* %{ try %{ write } }
-            hook buffer -group autosave InsertIdle .* %{ try %{ write } }
-        	set-option buffer auto_save_status true
-    		echo 'AUTO-SAVE ENABLED'
-    		echo -debug 'AUTO-SAVE ENABLED'" ;;
-    	true) printf %s "remove-hooks buffer autosave
-    		set-option buffer auto_save_status false
-    		echo -debug 'AUTO-SAVE DISABLED'
-    		echo 'AUTO-SAVE DISABLED'" ;;
-        esac
-} } 
-
-define-command find-file \
--docstring 'Fuzzy search for the files'\
--override \
--params .. \
-%{ prompt  -menu \
-	-shell-script-candidates %{fd -tf $@ } \
-    'File: '  %{ try %{ edit -existing %val{text} } }
-}
-
-map global user f ':find-file<ret>' \
-    -docstring 'Search for the file'
-map global user F ':find-file ' \
-    -docstring 'Search for the file with args'
-
-define-command find-buffer \
--docstring 'Open an exising buffer' \
--override \
-%{ prompt -menu -buffer-completion 'Buffer: ' 'buffer %val{text}' }
-map global user b ':find-buffer<ret>' \
-    -docstring 'Serch for the active buffers'
-
-define-command close-buffers \
--docstring 'Delete a buffer(s)' \
--override \
--buffer-completion \
--params .. \
-%{ evaluate-commands %sh{
-    set -- "$@"
-    for buffer; do
-    	echo "db $buffer" 
-    done
-} }
-alias global cb close-buffers
-
-define-command ls \
--docstring 'List files in the current directory' \
--override \
-%{ info -title "%val{buffile}" %sh{ ls -Alh } }
-map global normal <c-g> ":ls<ret>"
-
-define-command sh \
--override \
--file-completion \
--params 1.. \
-%{ echo %sh{ "$@" } }
-
-define-command set-filetype \
--docstring 'Set a filetype for current buffer' \
--override \
--params 1 \
-%{ set-option current filetype %arg{1} }
-alias global lang set-filetype
-
-define-command new-file \
--docstring 'Create a new file(s)'\
--override \
--params 1.. \
-%{ echo %sh{ touch "$@" }; edit %arg{1} }
-alias global nf new-file
-
-#------------------------------------------------------------------------------
-# rust helpers-----------------------------------------------------------------
-
-declare-user-mode cargo
-
-map global user c ':enter-user-mode cargo<ret>' \
-    -docstring 'Cargo mode'
-map global cargo f ':format<ret>' \
-	-docstring 'Format code'
-map  global cargo t %{:write; cargo test<ret>} \
-    -docstring "Run tests" 
-map  global cargo c %{:write; cargo clippy --all-targets<ret>} \
-    -docstring "Check syntax" 
-map  global cargo n %{: cargo-next-error<ret>} \
-    -docstring "Next error" 
-map  global cargo p %{: cargo-previous-error<ret>} \
-    -docstring "Previous error" 
-
-#------------------------------------------------------------------------------
-#format -----------------------------------------------------------------------
-
-define-command  format-buffer \
--docstring 'Format the current buffer' \
--override \
-%{ evaluate-commands %sh{
-    fmt="$kak_opt_formatcmd"
-	if [ -z "$fmt" ]; then
-		printf %s "fail formatcmd must be set"
-	else
-        $fmt $kak_buffile
-    fi
-} }
-alias global format format-buffer
-
-hook global WinSetOption filetype=(rust|lua|python) \
-%{ evaluate-commands %sh{
-    fmt_cmd=
-    case "$kak_opt_filetype" in
-        "rust") fmt_cmd="rustfmt" ;;
-        "lua") fmt_cmd="stylua" ;;
-        "python") fmt_cmd="black" ;;
-    esac
-    if ! type "$fmt_cmd" &> /dev/null; then
-    	printf %s "fail Install $fmt_cmd for $kak_buffile"
-	else
-        printf %s "set window formatcmd '$fmt_cmd $kak_buffile'"
-    fi
-} }
-
-#------------------------------------------------------------------------------
-#------------------------------------------------------------------------------
-
-source "%val{config}/cargo.kak"  
-
-#------------------------------------------------------------------------------
-# langmap ---------------------------------------------------------------------
-
-declare-option str def_langmap "en"
-declare-option str alt_langmap "ru"
-declare-option str current_langmap %opt{def_langmap}
-
-define-command toggle-langmap \
--override \
-%{ evaluate-commands %sh{
-    current=
-    def="$kak_opt_def_langmap"
-    alt="$kak_opt_alt_langmap"
-    case "$kak_opt_current_langmap" in
-        "$def") current="$alt" ;;
-        "$alt") current="$def" ;;
-    esac
-    "$kak_config/langmap.py" "$kak_opt_current_langmap" "$kak_opt_alt_langmap"
-    echo "set buffer current_langmap $current"
-} }
-map global normal <c-^> ':toggle-langmap<ret>'
-
-set-option global modelinefmt \
-'%val{bufname} %val{cursor_line}:%val{cursor_char_column} 
-{{context_info}} {{mode_info}} - %val{client}@[%val{session}] - (%opt{current_langmap})'
-
