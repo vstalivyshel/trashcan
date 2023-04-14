@@ -8,7 +8,7 @@ for theme in "${themes[@]}"; do
   choices+="$theme\n"
 done
 
-selected_theme=$(printf "$choices" | fzf)
+selected_theme=$(printf "$choices" | fzy)
 
 if [[ -z $selected_theme ]]; then
     exit 0

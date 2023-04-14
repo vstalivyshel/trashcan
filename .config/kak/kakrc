@@ -1,4 +1,4 @@
-colorscheme lotus
+colorscheme rose-pine
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
@@ -9,10 +9,10 @@ declare-option -hidden str glua "%val{config}/glua"
 
 add-highlighter -override global/ number-lines -relative -hlcursor -separator ' '
 add-highlighter -override global/ show-matching 
-set-option global ui_options terminal_assistant=none
-set-option global tabstop 4
-set-option global scrolloff 15,0
-set-option global startup_info_version 999999999
+set global ui_options terminal_assistant=none
+set global tabstop 4
+set global scrolloff 15,0
+set global startup_info_version 999999999
 set global autocomplete prompt
 
 hook global -group insert-color ModeChange .*:.*:insert %{
@@ -36,11 +36,14 @@ map global insert <c-e> '<a-;>gl<a-;>l'
 map global insert <a-,> '<a-;><'
 map global insert <a-.> '<a-;>>'
 map global insert <c-d> '<a-;>;<a-;>"_d'
-map global normal D '<a-z>a<a-(>'
+
 map global normal X 'x_'
-map global normal '#' ':comment-line<ret>'
 map global normal . '<a-.>'
 map global normal <a-.> '.'
+
+map global normal '#' ':comment-line<ret>'
+# TODO: make it separate command
+# map global normal <a-R> '*"iZ%s<ret>"oZ,"iz"o<a-z>a<a-:><a-;>'
 
 map global user w ":w<ret>" \
     -docstring 'Save'
@@ -48,10 +51,6 @@ map global user ';' 'y:<c-r>"<ret>' \
     -docstring 'Push selected into cmd'
 map global user ':' 'y:<c-r>"<ret>' \
     -docstring 'Push selected into cmd for all sessions'
-
-# hook buffer -group testing NormalKey '.*' %{
-#     echo %val{hook_param}
-# }
 
 # clipboard
 map global user y '<a-|>xsel --input --clipboard<ret>'\
@@ -88,38 +87,79 @@ eval -client %val{client} %sh{
         "$kak_opt_glua/lua_colors/make_color.lua" "$kak_buffile" "$kak_config/colors"
     fi 
 } }
-map global user M ':make-color-current-file<ret>'
+map global user M ':make-color-current-file<ret>' \
+-docstring 'Generate colorscheme from current lua specs'
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # splits ----------------------------------------------------------------------
+
+def jump-to-mark \
+-override \
+%{ on-key %{ try %{ exec %sh{ printf "\"%sz" "$kak_key" } } } }
+map global normal \' ":jump-to-mark<ret>"
+
+def surround-selection \
+-override \
+%{ on-key %{ eval -save-regs 'oc' %{
+    eval %sh{
+        o="$kak_key"
+        c=""
+    	case "$o" in
+        	"(") c=")" ;;
+        	"[") c="]" ;;
+        	"{") c="}" ;;
+        	"<") c=">" ;;
+        	*) c="$o" ;;
+    	esac
+    	printf %s "set-register c %¶$c¶ ;
+            	   set-register o %¶$o¶ ;"
+    }
+    exec -draft -itersel '"mZ"oP"mz"cp"mz'
+} } }
+map global normal <a-'> ':surround-selection<ret>'
+
+
+declare-user-mode window-mode
+map global normal <c-w> ":enter-user-mode window-mode<ret>"
+
+define-command term-vsplit \
+    -override \
+    %{ tmux-terminal-horizontal $SHELL  }
+map global window-mode 'V' ':term-vsplit<ret>'
+
+define-command term-hsplit \
+    -override \
+    %{ tmux-terminal-vertical $SHELL  }
+map global window-mode 'S' ':term-hsplit<ret>'
+
+define-command term-hsplit \
+    -override \
+    %{ tmux-terminal-window $SHELL  }
+map global window-mode 'T' ':term-hsplit<ret>'
 
 define-command buf-vsplit \
     -override \
     %{ tmux-terminal-horizontal kak -c %val{session} -e \
-    "e %val{buffile} ; select %val{selection_desc} ; exec vv"  }
+"e %val{buffile} ; select %val{selection_desc} ; exec vv"  }
+map global window-mode v ":buf-vsplit<ret>" \
+    -docstring 'Open current buffer in vertical split'
 
 define-command buf-hsplit \
     -override \
     %{ tmux-terminal-vertical kak -c %val{session} -e \
     "e %val{buffile} ; select %val{selection_desc} ; exec vv"  }
+map global window-mode s ":buf-hsplit<ret>" \
+    -docstring 'Open current buffer in horizontal split'
 
 define-command buf-tab \
     -override \
     %{ tmux-terminal-window kak -c %val{session} -e \
     "e %val{buffile} ; select %val{selection_desc} ; exec vv"  }
-
-declare-user-mode window-mode
-
-map global normal <c-w> ":enter-user-mode window-mode<ret>"
-map global window-mode q ":q<ret>" \
-	-docstring 'Close current window'
-map global window-mode v ":buf-vsplit<ret>" \
-    -docstring 'Open current buffer in vertical split'
-map global window-mode s ":buf-hsplit<ret>" \
-    -docstring 'Open current buffer in horizontal split'
 map global window-mode t ":buf-tab<ret>" \
     -docstring 'Open current buffer in new tab'
 
+map global window-mode q ":q<ret>" \
+	-docstring 'Close current window'
 
 # ------------------------------------------------------------------------------
 # auto-pairs--------------------------------------------------------------------
@@ -142,21 +182,6 @@ hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' \
     } 
 }
 
-# declare-user-mode surround
-
-# define-command -hidden -override surround-selection -params 1..2  %{
-# 	evaluate-commands -save-regs 'rl' %sh{
-#     	pairs="$kak_opt_pairs"
-#     	r=$("$pairs" "$1" "r$2")
-#     	l=$("$pairs" "$1" "l$2")
-#     	printf %s "set-register r %{$r} ; set-register l %{$l}"
-# 	}
-# 	exec 
-# }
-
-# map global normal \' ":enter-user-mode surround<ret>"
-# map global surround \' 
-
 #------------------------------------------------------------------------------
 # little helper----------------------------------------------------------------
 
@@ -177,11 +202,12 @@ alias global kak kak-talk
 define-command find-file \
 -docstring 'Fuzzy search for the files'\
 -override \
-%{ prompt  -menu \
-	-shell-script-candidates %{fd -tf -E "colors/*.kak"} \
-    'File: '  %{ try %{ edit -existing %val{text} } }
+%{ prompt  -menu  -shell-script-candidates %{
+	 find -type f -not -path "*/colors/*"
+    } \
+'File: '  %{ try %{ edit -existing %val{text} } }
 }
-map global user f ':find-file<ret>' \
+ map global user f ':find-file<ret>' \
     -docstring 'Search for the file'
 
 define-command find-buffer \
@@ -305,26 +331,19 @@ define-command change-exec-pos \
 map global user s ':change-exec-pos<ret>' \
     -docstring 'Switch run-code split position'
 
-declare-option str runcmd
+declare-option str runcmd 
 
-define-command run-code \
+define-command run-file \
 -override \
 -params .. \
 %{ echo %sh{
-    execute= 
-    code="$kak_buffile"
-    case $kak_opt_filetype in
-        "lua") execute="lua $code" ;;
-        "python") execute="python $code" ;;
-        "sh") execute="bash $code" ;;
-        "rust") execute="cargo run"  ;;
-    esac
-    tmux splitw -"$kak_opt_run_pos" "$execute $@ ; $SHELL"
+    execute="$kak_opt_runcmd $kak_buffile" 
+    tmux splitw -"$kak_opt_run_pos" "$execute -- $@ ; $SHELL"
 } }
-map global user r ':run-code<ret>' \
+map global user r ':run-file<ret>' \
     -docstring 'Execute current file'
 
-define-command -hidden run-code-with-args \
-    %{ prompt 'Args to code: ' %{ run-code %val{text} }  }
-map global user R ':run-code-with-args<ret>' \
+define-command -hidden run-file-with-args \
+    %{ prompt 'Args to file: ' %{ run-file %val{text} }  }
+map global user R ':run-file-with-args<ret>' \
     -docstring 'Execute current file with given args'

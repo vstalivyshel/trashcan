@@ -6,7 +6,7 @@ dirs+="$HOME/Downloads "
 dirs+="$HOME/HoneyBunny/storagefile "
 dirs+="$HOME/HoneyBunny "
 
-selected=$(find $dirs -maxdepth 1 -type d | fzf)
+selected=$(find $dirs -maxdepth 1 -type d | fzy -l 100)
 
 if [[ -z "$selected" ]]; then
     exit 0
