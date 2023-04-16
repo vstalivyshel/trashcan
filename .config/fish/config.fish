@@ -1,12 +1,13 @@
-set LP (echo (luajit -e '
+set LP (echo (lua -e '
     local p = os.getenv("HOME") .. "/.mylua/?.lua;" 
     print(p .. package.path)
 ' ))
 
 if status is-interactive
-    fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin $HOME/.local/scr $HOME/.nimble/bin
+    fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin $HOME/.local/scr
     fish_add_path /home/linuxbrew/.linuxbrew/opt/clang-format/bin
 
+	set -xga PKG_CONFIG_PATH /usr/lib64/pkgconfig
     set fish_cursor_default block
     set -Ux EDITOR kak
     set -Ux VISUAL $EDITOR
@@ -15,9 +16,9 @@ if status is-interactive
     bind \cl 'ls -Ahls; commandline -f repaint'
     setxkbmap -option "ctrl:nocaps"
 
-    set -U FZF_DEFAULT_COMMAND fd --hidden
-    set -U PYTHONDONTWRITEBYTECODE 1
-    set -Ux LUA_PATH $LP
+    set -g FZF_DEFAULT_COMMAND fd --hidden
+    set -g PYTHONDONTWRITEBYTECODE 1
+    set -gx LUA_PATH $LP
 
     alias up='sudo dnf update -y; rustup update; brew upgrade'
     alias dfs="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME"

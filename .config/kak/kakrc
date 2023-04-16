@@ -1,4 +1,4 @@
-colorscheme rose-pine
+colorscheme lotus
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
@@ -84,7 +84,7 @@ eval -client %val{client} %sh{
     if [ $file != "lua" ]; then
         printf %s "fail you are not in lua color file!"
     else
-        "$kak_opt_glua/lua_colors/make_color.lua" "$kak_buffile" "$kak_config/colors"
+        "$kak_opt_glua/colors/make_color.lua" "$kak_buffile" "$kak_config/colors"
     fi 
 } }
 map global user M ':make-color-current-file<ret>' \
@@ -100,29 +100,42 @@ map global normal \' ":jump-to-mark<ret>"
 
 def surround-selection \
 -override \
+-params 1 \
 %{ on-key %{ eval -save-regs 'oc' %{
     eval %sh{
+        spc=""
+        [ "$1" == true ] && spc=" "
         o="$kak_key"
-        c=""
+        c="$spc"
     	case "$o" in
-        	"(") c=")" ;;
-        	"[") c="]" ;;
-        	"{") c="}" ;;
-        	"<") c=">" ;;
-        	*) c="$o" ;;
+            "<lt>" | "<gt>") o="<" c="$spc>" ;;
+            "(" | ")") c+=")" ;;
+        	"[" | "]") c+="]" ;;
+        	"{") c+="}" ;;
+        	*) c+="$o" ;;
     	esac
+    	o+="$spc"
     	printf %s "set-register c %¶$c¶ ;
             	   set-register o %¶$o¶ ;"
     }
     exec -draft -itersel '"mZ"oP"mz"cp"mz'
 } } }
-map global normal <a-'> ':surround-selection<ret>'
+map global normal <a-'> ':surround-selection false<ret>'
+map global normal <a-"> ':surround-selection true<ret>'
 
+def surround-selection-custom \
+-override \
+%{prompt  'Custom-sur-obj: ' %{
+    eval -save-regs 'cz' %{
+        set-register c %val{text}
+        exec -draft -itersel 'Z"cPz"cpz'
+    }
+} }
 
 declare-user-mode window-mode
 map global normal <c-w> ":enter-user-mode window-mode<ret>"
 
-define-command term-vsplit \
+            	   define-command term-vsplit \
     -override \
     %{ tmux-terminal-horizontal $SHELL  }
 map global window-mode 'V' ':term-vsplit<ret>'
@@ -132,7 +145,7 @@ define-command term-hsplit \
     %{ tmux-terminal-vertical $SHELL  }
 map global window-mode 'S' ':term-hsplit<ret>'
 
-define-command term-hsplit \
+define-command term-tab \
     -override \
     %{ tmux-terminal-window $SHELL  }
 map global window-mode 'T' ':term-hsplit<ret>'
@@ -203,10 +216,8 @@ define-command find-file \
 -docstring 'Fuzzy search for the files'\
 -override \
 %{ prompt  -menu  -shell-script-candidates %{
-	 find -type f -not -path "*/colors/*"
-    } \
-'File: '  %{ try %{ edit -existing %val{text} } }
-}
+find -type f -not -path "*/colors/*" -not -path "*/\.*/*" -not -path "*/target/*"
+} 'File: '  %{ try %{ edit -existing %val{text} } } }
  map global user f ':find-file<ret>' \
     -docstring 'Search for the file'
 
@@ -258,7 +269,7 @@ alias global nf new-file
 # langmap ---------------------------------------------------------------------
 
 declare-option str def_langmap "en"
-declare-option str alt_langmap "ru"
+    declare-option str alt_langmap "ru"
 declare-option str current_langmap %opt{def_langmap}
 declare-option str langmap_me "%opt{glua}/langmap.py"
 

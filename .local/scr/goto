@@ -2,6 +2,7 @@
 
 dirs="$HOME/.local/scr "
 dirs+="$HOME/.config "
+dirs+="$HOME/.config/kak/testing "
 dirs+="$HOME/Downloads "
 dirs+="$HOME/HoneyBunny/storagefile "
 dirs+="$HOME/HoneyBunny "
