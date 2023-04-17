@@ -93,36 +93,6 @@ map global user M ':make-color-current-file<ret>' \
 # ------------------------------------------------------------------------------
 # splits ----------------------------------------------------------------------
 
-def jump-to-mark \
--override \
-%{ on-key %{ try %{ exec %sh{ printf "\"%sz" "$kak_key" } } } }
-map global normal \' ":jump-to-mark<ret>"
-
-def surround-selection \
--override \
--params 1 \
-%{ on-key %{ eval -save-regs 'oc' %{
-    eval %sh{
-        spc=""
-        [ "$1" == true ] && spc=" "
-        o="$kak_key"
-        c="$spc"
-    	case "$o" in
-            "<lt>" | "<gt>") o="<" c="$spc>" ;;
-            "(" | ")") c+=")" ;;
-        	"[" | "]") c+="]" ;;
-        	"{") c+="}" ;;
-        	*) c+="$o" ;;
-    	esac
-    	o+="$spc"
-    	printf %s "set-register c %¶$c¶ ;
-            	   set-register o %¶$o¶ ;"
-    }
-    exec -draft -itersel '"mZ"oP"mz"cp"mz'
-} } }
-map global normal <a-'> ':surround-selection false<ret>'
-map global normal <a-"> ':surround-selection true<ret>'
-
 def surround-selection-custom \
 -override \
 %{prompt  'Custom-sur-obj: ' %{
@@ -197,6 +167,42 @@ hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' \
 
 #------------------------------------------------------------------------------
 # little helper----------------------------------------------------------------
+
+def switch-selections \
+-override \
+%{ try %{ exec '<a-z>a<a-)>' } }
+map global normal <a-r> ':switch-selections<ret>'
+
+def jump-to-mark \
+-override \
+%{ on-key %{ try %{ exec %sh{ printf "\"%sz" "$kak_key" } } } }
+map global normal \' ":jump-to-mark<ret>"
+
+def surround-selection \
+-override \
+-params 1 \
+%{ on-key %{ eval -save-regs 'oc' %{
+    eval %sh{
+        spc=""
+        [ "$1" == true ] && spc=" "
+        o="$kak_key"
+        c=
+    	case "$o" in
+            "<lt>" | "<gt>") o="<" c=">" ;;
+            "(" | ")") o="(" c=")" ;;
+        	"[" | "]") o="[" c="]" ;;
+        	"{") c="}" ;;
+        	*) c+="$o" ;;
+    	esac
+    	o="$o$spc"
+    	c="$spc$c"
+    	printf %s "set-register c %¶$c¶ ;
+            	   set-register o %¶$o¶ ;"
+    }
+    exec -draft -itersel '"mZ"oP"mz"cp"mz'
+} } }
+map global normal <a-'> ':surround-selection false<ret>'
+map global normal <a-"> ':surround-selection true<ret>'
 
 define-command auto-info \
 -docstring 'command|onkey|normal' \
