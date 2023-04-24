@@ -1,8 +1,16 @@
-colorscheme rose-pine-moon
+colorscheme lotus
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
 declare-option -hidden str glua "%val{config}/glua"
+
+# ------------------------------------------------------------------------------
+# Glua  ------------------------------------------------------------------------
+
+
+# def -override glua-send-data %{
+#     echo
+# }
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -301,7 +309,7 @@ map global insert '<c-^>' '<a-;>:toggle-langmap<ret>'
 #------------------------------------------------------------------------------
 # Autosave
 define-command enable-auto-save -override  %{ 
-hook buffer -group auto-save NormalKey 'c|(?i)(d|p|u|r)' \
+    hook buffer -group auto-save NormalKey 'c|(?i)(d|p|u|r)' \
     %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
 hook buffer -group auto-save ModeChange '.*:.*:insert' \
     %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
