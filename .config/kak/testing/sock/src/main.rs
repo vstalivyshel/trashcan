@@ -1,7 +1,14 @@
-mod json_ui;
-use json_ui::{IncomingRequest, OutgoingRequest};
-use std::io::{BufWriter, BufRead, BufReader, Read, Write};
+mod kak_json;
+mod utils;
+mod traits;
+use traits::*;
+use kak_json::{IncomingRequest, OutgoingRequest, RawOutgoingRequest};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::process::{Command, Stdio};
+
+// TODO: connect to the socket try to send msg through socket
+// TODO: Test sending json request
+// TODO: Try sending lua coed and eval it
 
 fn spawn_json_client() -> std::process::Child {
     Command::new("kak")
@@ -13,41 +20,72 @@ fn spawn_json_client() -> std::process::Child {
         .unwrap()
 }
 
+fn send_json_request<T: Write>(writer: &mut T, req: &OutgoingRequest) -> std::io::Result<String> {
+    let request = serde_json::to_string::<OutgoingRequest>(req)?;
+    writer.write_all(request.as_bytes())?;
+    writer.flush()?;
+    Ok(request)
+}
+
+fn process_incoming_request(method: IncomingRequest) {
+    println!("GLUA::IncomingRequest = {method}");
+    match method {
+        IncomingRequest::InfoShow {
+            ref title,
+            ref content,
+            ..
+        } => {
+            let info_content = content.to_content();
+            let title_content = title.to_content();
+            println!("GLUA::InfoShow.title.content = \"{title_content}\"");
+            println!("GLUA::InfoShow.content.content = \"{info_content}\"");
+        }
+        IncomingRequest::DrawStatus {
+            ref status_line,
+            ref mode_line,
+            ..
+        } => {
+            let status_msg = status_line.to_content();
+            let mode_line_content = mode_line.to_content();
+            println!("GLUA::status_line.content = \"{status_msg}\"");
+            println!("GLUA::mode_line.content = \"{mode_line_content}\"");
+        }
+
+        _ => {}
+    }
+}
 
 fn get_some_json() {
     let mut server = spawn_json_client();
-    let output = server.stdout.take().unwrap();
-    let inp = server.stdin.take().unwrap();
-    let err_out = server.stderr.take().unwrap();
-    let reader = BufReader::new(output);
-    let mut writer = BufWriter::new(inp);
-	let (sender, receiver) = std::sync::mpsc::channel();
+
+    let mut json_client_stdout = BufReader::new(server.stdout.take().expect("server stdout"));
+    let mut json_client_stdin = BufWriter::new(server.stdin.take().expect("server stdin"));
+
     std::thread::spawn(move || {
-        let mut err_reader = BufReader::new(err_out);
-		for line in err_reader.lines() {
-    		sender.send(line.unwrap());
-		}
-    });
-
-	let mut err = String::new();
-    for line in reader.lines() {
-        let method: IncomingRequest = serde_json::from_str(&line.unwrap()).unwrap();
-        match method {
-            IncomingRequest::InfoShow { .. } => {
-                println!("{:?}", method);
-                let out_method = OutgoingRequest::Keys(vec![ ":eval -client client0 %{ echo sasha }<ret>".to_string() ]);
-                println!("{:?}", out_method);
-                serde_json::to_writer(&mut writer, &out_method).unwrap();
-                if let Ok(err_msg) = receiver.try_recv() {
-                    println!("Stderr msg : {err_msg}");
-                }
-            },
-            IncomingRequest::DrawStatus { status_line, mode_line, default_face, } => {
-                let status_msg = status_line.iter().map(|atom| atom.contents)
-            },
-
-            _ => println!("{}", method),
+        let json_client_stderr = BufReader::new(server.stderr.take().expect("server stderr"));
+        for err in json_client_stderr.lines() {
+            println!(
+                "GLUA::ERR = Error while parsing outgoing json request: {err}",
+                err = err.unwrap()
+            );
         }
+    });
+    let mut buffer = Vec::<u8>::new();
+    loop {
+        buffer.clear();
+        json_client_stdout.read_until(b'\n', &mut buffer).unwrap();
+        match serde_json::from_slice::<IncomingRequest>(&buffer) {
+            Ok(method) => {
+                process_incoming_request(method);
+            }
+            Err(e) => {
+                println!(
+                    "GLUA::ERR = Error while parsing incoming json request: {}",
+                    e
+                );
+            }
+        }
+        println!("------------------------------------------------------------");
     }
 }
 

@@ -1,12 +1,5 @@
-use crate::json_ui;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::PathBuf;
-
-impl From<Line> for String {
-    fn from(Line) -> String {
-
-    }
-}
 
 pub fn glua_temp_dir() -> PathBuf {
     let mut path = std::env::temp_dir();
@@ -24,6 +17,12 @@ pub struct TempFifo {
     pub path: String,
 }
 
+impl Drop for TempFifo {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
 pub fn temp_fifo(file_path: PathBuf) -> Option<TempFifo> {
     let path = file_path.to_str().unwrap().to_string();
     let p = std::ffi::CString::new(path.clone()).unwrap();
@@ -35,12 +34,6 @@ pub fn temp_fifo(file_path: PathBuf) -> Option<TempFifo> {
     }
 
     Some(TempFifo { path })
-}
-
-impl Drop for TempFifo {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
-    }
 }
 
 macro_rules! _kak_var {

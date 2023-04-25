@@ -1,87 +1,24 @@
-// Stolen from https://docs.rs/crate/kak-ui/0.2.0/source/src/lib.rs
+use crate::kak_json::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashMap;
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct Face {
-    pub attributes: Vec<String>,
-    pub bg: String,
-    pub fg: String,
-    pub underline: String,
+pub trait ToContent {
+    fn to_content(&self) -> String;
 }
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct Atom {
-    pub contents: String,
-    pub face: Face,
+impl ToContent for Atoms {
+    fn to_content(&self) -> String {
+        let mut content = String::new();
+        self.iter().for_each(|atom| content.push_str(&atom.contents));
+        content
+    }
 }
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct Coord {
-    pub column: u64,
-    pub line: u64,
-}
-
-type Line = Vec<Atom>;
-
-
-#[derive(Clone, Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-#[serde(tag = "method", content = "params")]
-enum RawIncomingRequest {
-    Draw(Vec<Line>, Face, Face),
-    DrawStatus(Line, Line, Face),
-    MenuShow(Vec<Line>, Coord, Face, Face, String),
-    MenuSelect((u32,)),
-    MenuHide([(); 0]),
-    InfoShow(Line, Vec<Line>, Coord, Face, String),
-    InfoHide([(); 0]),
-    SetCursor(String, Coord),
-    SetUiOptions((HashMap<String, String>,)),
-    Refresh((bool,)),
-}
-
-#[derive(Clone, Debug)]
-pub enum IncomingRequest {
-    Draw {
-        lines: Vec<Line>,
-        default_face: Face,
-        padding_face: Face,
-    },
-    DrawStatus {
-        status_line: Line,
-        mode_line: Line,
-        default_face: Face,
-    },
-    MenuShow {
-        items: Vec<Line>,
-        anchor: Coord,
-        selected_item_face: Face,
-        menu_face: Face,
-        style: String,
-    },
-    MenuSelect {
-        selected: u32,
-    },
-    MenuHide,
-    InfoShow {
-        title: Line,
-        content: Vec<Line>,
-        anchor: Coord,
-        face: Face,
-        style: String,
-    },
-    InfoHide,
-    SetCursor {
-        mode: String,
-        coord: Coord,
-    },
-    SetUiOptions {
-        options: HashMap<String, String>,
-    },
-    Refresh {
-        force: bool,
-    },
+impl ToContent for Vec<Atoms> {
+    fn to_content(&self) -> String {
+        let mut content = String::new();
+        let _ = self.iter().flat_map(|atoms| atoms.iter()).map(|atom| content.push_str(&atom.contents));
+        content
+    }
 }
 
 impl std::fmt::Display for IncomingRequest {
@@ -152,49 +89,6 @@ impl From<RawIncomingRequest> for IncomingRequest {
     }
 }
 
-/// A outgoing request. Input this to kakoune via stdin.
-#[derive(Debug, Clone)]
-pub enum OutgoingRequest {
-    Keys(Vec<String>),
-    Resize {
-        rows: u32,
-        columns: u32,
-    },
-    Scroll {
-        amount: u32,
-    },
-    MouseMove {
-        line: u32,
-        column: u32,
-    },
-    MousePress {
-        button: String,
-        line: u32,
-        column: u32,
-    },
-    MouseRelease {
-        button: String,
-        line: u32,
-        column: u32,
-    },
-    MenuSelect {
-        index: u32,
-    },
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "snake_case")]
-#[serde(tag = "method", content = "params")]
-enum RawOutgoingRequest {
-    Keys(Vec<String>),
-    Resize(u32, u32),
-    Scroll((u32,)),
-    MouseMove(u32, u32),
-    MousePress(String, u32, u32),
-    MouseRelease(String, u32, u32),
-    MenuSelect((u32,)),
-}
-
 impl Serialize for OutgoingRequest {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -231,18 +125,3 @@ impl From<OutgoingRequest> for RawOutgoingRequest {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-struct JsonRpc<T> {
-    jsonrpc: String,
-    #[serde(flatten)]
-    inner: T,
-}
-
-impl<T> JsonRpc<T> {
-    fn new(inner: T) -> Self {
-        Self {
-            jsonrpc: "2.0".to_string(),
-            inner,
-        }
-    }
-}
