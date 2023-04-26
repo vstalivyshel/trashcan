@@ -1,29 +1,52 @@
-mod kak_json;
-mod utils;
+mod kak_jsonrpc;
 mod traits;
-use traits::*;
-use kak_json::{IncomingRequest, OutgoingRequest, RawOutgoingRequest};
+mod utils;
+use utils::msg_to_socket;
+use serde_json::{Result};
+use kak_jsonrpc::{IncomingRequest, OutgoingRequest, RawOutgoingRequest};
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
-use std::process::{Command, Stdio};
+use std::process::{self, Command, Stdio};
+use traits::*;
 
 // TODO: Test sending json request
 // TODO: Try sending lua coed and eval it
 
-fn spawn_json_client() -> std::process::Child {
-    Command::new("kak")
-        .args(["-c", "sock", "-ui", "json"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdin(Stdio::piped())
-        .spawn()
-        .unwrap()
+struct JsonClient {
+    process: process::Child,
+    stdout: BufReader<process::ChildStdout>,
+    stderr: BufReader<process::ChildStderr>,
+    stdin: BufWriter<process::ChildStdin>,
 }
 
-fn send_json_request<T: Write>(writer: &mut T, req: &OutgoingRequest) -> std::io::Result<String> {
-    let request = serde_json::to_string::<OutgoingRequest>(req)?;
-    writer.write_all(request.as_bytes())?;
-    writer.flush()?;
-    Ok(request)
+impl JsonClient {
+    fn connect(session_name: &str) -> std::io::Result<Self> {
+        let mut process = Command::new("kak")
+            .args(["-c", "sock", "-ui", "json"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdin(Stdio::piped())
+            .spawn()?;
+
+        let stdout = BufReader::new(process.stdout.take().unwrap());
+        let stderr = BufReader::new(process.stderr.take().unwrap());
+        let stdin = BufWriter::new(process.stdin.take().unwrap());
+
+        Ok(Self {
+            process,
+            stdout,
+            stderr,
+            stdin,
+        })
+    }
+
+    fn send_request(&mut self, out_request: &OutgoingRequest) -> std::io::Result<String> {
+        let req = serde_json::to_string::<OutgoingRequest>(out_request)?;
+        self.stdin.write_all(req.as_bytes())?;
+        self.stdin.flush()?;
+
+        Ok(req)
+    }
+
 }
 
 fn process_incoming_request(method: IncomingRequest) {
@@ -54,14 +77,14 @@ fn process_incoming_request(method: IncomingRequest) {
     }
 }
 
-fn get_some_json() {
-    let mut server = spawn_json_client();
+fn run() {
+    let mut server = JsonClient::connect("sock").expect("glua server");
 
-    let mut json_client_stdout = BufReader::new(server.stdout.take().expect("server stdout"));
-    let mut json_client_stdin = BufWriter::new(server.stdin.take().expect("server stdin"));
+    let mut json_client_stdout = server.stdout;
+    let mut json_client_stdin = server.stdin;
 
     std::thread::spawn(move || {
-        let json_client_stderr = BufReader::new(server.stderr.take().expect("server stderr"));
+        let json_client_stderr = server.stderr;
         for err in json_client_stderr.lines() {
             println!(
                 "GLUA::ERR = Error while parsing outgoing json request: {err}",
@@ -83,33 +106,15 @@ fn get_some_json() {
                     "GLUA::ERR = Error while parsing incoming json request: {}",
                     error
                 );
+                if error.is_eof() {
+                    break;
+                }
             }
         }
         println!("------------------------------------------------------------");
     }
 }
 
-fn send_to_socket(session_name: &str, msg: &str) {
-    use std::os::unix::net::UnixStream;
-    let rntimedir = std::env::var("XDG_RUNTIME_DIR").unwrap();
-    let socket_path = std::path::Path::new(&rntimedir).join("kakoune").join(session_name);
-    let mut stream = UnixStream::connect(socket_path).unwrap();
-
-	let mut content = msg.bytes().collect::<Vec<u8>>();
-	let encoded_cmd_len = (msg.len() as u32).to_ne_bytes();
-	content.splice(..0, encoded_cmd_len);
-
-	let header_byte = b'\x02';
-	let encoded_whole_msg_len = (content.len() as u32 + 5).to_ne_bytes();
-	content.splice(..0, encoded_whole_msg_len);
-	content.insert(0, header_byte);
-
-	// println!("{:?}" , String::from_utf8(content).unwrap());
-
-    stream.write(&content).unwrap();
-    stream.flush().unwrap();
-}
-
 fn main() {
-    send_to_socket("sock", "");
+    run();
 }

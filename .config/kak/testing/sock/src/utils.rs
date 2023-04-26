@@ -1,5 +1,25 @@
+use std::os::unix::net::UnixStream;
+use std::io::{Write};
 use std::os::unix::fs::DirBuilderExt;
 use std::path::PathBuf;
+
+pub fn msg_to_socket(session_name: &str, msg: &str) -> std::io::Result<()> {
+    let rntimedir = std::env::var("XDG_RUNTIME_DIR").expect("runtime path");
+    let socket_path = std::path::Path::new(&rntimedir)
+        .join("kakoune")
+        .join(session_name);
+    let mut stream = UnixStream::connect(socket_path)?;
+
+    let mut result = Vec::<u8>::with_capacity(msg.len() + 9);
+    result.splice(..0, (msg.len() as u32).to_ne_bytes());
+    msg.bytes().for_each(|b| result.push(b));
+    result.splice(..0, (result.len() as u32 + 5).to_ne_bytes());
+    result.insert(0, b'\x02');
+    stream.write(&result)?;
+    stream.flush()?;
+
+    Ok(())
+}
 
 pub fn glua_temp_dir() -> PathBuf {
     let mut path = std::env::temp_dir();
