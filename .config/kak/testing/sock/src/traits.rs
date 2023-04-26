@@ -1,20 +1,20 @@
 use crate::kak_json::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub trait ToContent {
-    fn to_content(&self) -> String;
+pub trait GetContent {
+    fn get_content(&self) -> String;
 }
 
-impl ToContent for Atoms {
-    fn to_content(&self) -> String {
+impl GetContent for Atoms {
+    fn get_content(&self) -> String {
         let mut content = String::new();
         self.iter().for_each(|atom| content.push_str(&atom.contents));
         content
     }
 }
 
-impl ToContent for Vec<Atoms> {
-    fn to_content(&self) -> String {
+impl GetContent for Vec<Atoms> {
+    fn get_content(&self) -> String {
         let mut content = String::new();
         let _ = self.iter().flat_map(|atoms| atoms.iter()).map(|atom| content.push_str(&atom.contents));
         content

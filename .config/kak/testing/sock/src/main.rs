@@ -6,7 +6,6 @@ use kak_json::{IncomingRequest, OutgoingRequest, RawOutgoingRequest};
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::process::{Command, Stdio};
 
-// TODO: connect to the socket try to send msg through socket
 // TODO: Test sending json request
 // TODO: Try sending lua coed and eval it
 
@@ -35,8 +34,8 @@ fn process_incoming_request(method: IncomingRequest) {
             ref content,
             ..
         } => {
-            let info_content = content.to_content();
-            let title_content = title.to_content();
+            let info_content = content.get_content();
+            let title_content = title.get_content();
             println!("GLUA::InfoShow.title.content = \"{title_content}\"");
             println!("GLUA::InfoShow.content.content = \"{info_content}\"");
         }
@@ -45,8 +44,8 @@ fn process_incoming_request(method: IncomingRequest) {
             ref mode_line,
             ..
         } => {
-            let status_msg = status_line.to_content();
-            let mode_line_content = mode_line.to_content();
+            let status_msg = status_line.get_content();
+            let mode_line_content = mode_line.get_content();
             println!("GLUA::status_line.content = \"{status_msg}\"");
             println!("GLUA::mode_line.content = \"{mode_line_content}\"");
         }
@@ -74,14 +73,15 @@ fn get_some_json() {
     loop {
         buffer.clear();
         json_client_stdout.read_until(b'\n', &mut buffer).unwrap();
-        match serde_json::from_slice::<IncomingRequest>(&buffer) {
+        let incom_request = serde_json::from_slice::<IncomingRequest>(&buffer);
+        match incom_request {
             Ok(method) => {
                 process_incoming_request(method);
             }
-            Err(e) => {
+            Err(error) => {
                 println!(
                     "GLUA::ERR = Error while parsing incoming json request: {}",
-                    e
+                    error
                 );
             }
         }
@@ -89,6 +89,27 @@ fn get_some_json() {
     }
 }
 
+fn send_to_socket(session_name: &str, msg: &str) {
+    use std::os::unix::net::UnixStream;
+    let rntimedir = std::env::var("XDG_RUNTIME_DIR").unwrap();
+    let socket_path = std::path::Path::new(&rntimedir).join("kakoune").join(session_name);
+    let mut stream = UnixStream::connect(socket_path).unwrap();
+
+	let mut content = msg.bytes().collect::<Vec<u8>>();
+	let encoded_cmd_len = (msg.len() as u32).to_ne_bytes();
+	content.splice(..0, encoded_cmd_len);
+
+	let header_byte = b'\x02';
+	let encoded_whole_msg_len = (content.len() as u32 + 5).to_ne_bytes();
+	content.splice(..0, encoded_whole_msg_len);
+	content.insert(0, header_byte);
+
+	// println!("{:?}" , String::from_utf8(content).unwrap());
+
+    stream.write(&content).unwrap();
+    stream.flush().unwrap();
+}
+
 fn main() {
-    get_some_json();
+    send_to_socket("sock", "");
 }

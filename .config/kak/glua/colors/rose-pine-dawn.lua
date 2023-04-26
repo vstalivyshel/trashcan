@@ -55,7 +55,7 @@ return {
     MatchingChar           = {rose, base},
     Whitespace             = {text, base},
     WrapMarker             = "Whitespace",
-    BufferPadding          = "LineNumbers",
+    BufferPadding          = base,
 
     --- Code ---
     value                  = iris,
