@@ -1,26 +1,27 @@
 use crate::kak_jsonrpc::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub trait GetContent {
-    fn get_content(&self) -> String;
+pub trait CollectContent {
+    fn collect_content(&self) -> String;
 }
 
-impl GetContent for Atoms {
-    fn get_content(&self) -> String {
+impl CollectContent for Line {
+    fn collect_content(&self) -> String {
         let mut content = String::new();
         self.iter()
             .for_each(|atom| content.push_str(&atom.contents));
+
         content
     }
 }
 
-impl GetContent for Vec<Atoms> {
-    fn get_content(&self) -> String {
+impl CollectContent for Vec<Line> {
+    fn collect_content(&self) -> String {
         let mut content = String::new();
-        let _ = self
-            .iter()
-            .flat_map(|atoms| atoms.iter())
-            .map(|atom| content.push_str(&atom.contents));
+        self.iter()
+            .flatten()
+            .for_each(|atom| content.push_str(&atom.contents));
+
         content
     }
 }

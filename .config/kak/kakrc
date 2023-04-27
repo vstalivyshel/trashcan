@@ -1,4 +1,4 @@
-colorscheme kanagawa
+colorscheme rose-pine-moon
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
@@ -7,10 +7,29 @@ declare-option -hidden str glua "%val{config}/glua"
 # ------------------------------------------------------------------------------
 # Glua  ------------------------------------------------------------------------
 
+def glua-sock -override -params 1.. %{
+    try %{
+        eval -client GLUA %{ info -title SOCK "%arg{@}" }
+    } catch %{
+        echo -markup %{{Error}GLUA::ERR = Glua Client is not connected! }
+    }
+}
 
-# def -override glua-send-data %{
-#     echo
-# }
+def glua-lua -override -params 1.. %{
+    try %{
+        eval -client GLUA %{ info -title LUA "%arg{@}" }
+    } catch %{
+        echo -markup %{{Error}GLUA::ERR = Glua Client is not connected! }
+    }
+}
+
+def glua-exec -override -params 1.. %{
+    try %{
+        eval -client GLUA %{ info -title EXEC "%arg{@}" }
+    } catch %{
+        echo -markup %{{Error}GLUA::ERR = Glua Client is not connected! }
+    }
+}
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------

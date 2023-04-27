@@ -1,4 +1,4 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Deserialize, Clone, Debug)]
@@ -21,18 +21,18 @@ pub struct Coord {
     pub line: u64,
 }
 
-pub type Atoms = Vec<Atom>;
+pub type Line = Vec<Atom>;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "method", content = "params")]
 pub enum RawIncomingRequest {
-    Draw(Vec<Atoms>, Face, Face),
-    DrawStatus(Atoms, Atoms, Face),
-    MenuShow(Vec<Atoms>, Coord, Face, Face, String),
+    Draw(Vec<Line>, Face, Face),
+    DrawStatus(Line, Line, Face),
+    MenuShow(Vec<Line>, Coord, Face, Face, String),
     MenuSelect((u32,)),
     MenuHide([(); 0]),
-    InfoShow(Atoms, Vec<Atoms>, Coord, Face, String),
+    InfoShow(Line, Vec<Line>, Coord, Face, String),
     InfoHide([(); 0]),
     SetCursor(String, Coord),
     SetUiOptions((HashMap<String, String>,)),
@@ -42,17 +42,17 @@ pub enum RawIncomingRequest {
 #[derive(Clone, Debug)]
 pub enum IncomingRequest {
     Draw {
-        lines: Vec<Atoms>,
+        lines: Vec<Line>,
         default_face: Face,
         padding_face: Face,
     },
     DrawStatus {
-        status_line: Atoms,
-        mode_line: Atoms,
+        status_line: Line,
+        mode_line: Line,
         default_face: Face,
     },
     MenuShow {
-        items: Vec<Atoms>,
+        items: Vec<Line>,
         anchor: Coord,
         selected_item_face: Face,
         menu_face: Face,
@@ -63,8 +63,8 @@ pub enum IncomingRequest {
     },
     MenuHide,
     InfoShow {
-        title: Atoms,
-        content: Vec<Atoms>,
+        title: Line,
+        content: Vec<Line>,
         anchor: Coord,
         face: Face,
         style: String,
