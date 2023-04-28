@@ -44,6 +44,21 @@ impl std::fmt::Display for IncomingRequest {
     }
 }
 
+impl std::fmt::Display for OutgoingRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use OutgoingRequest::*;
+        match self {
+            Keys { .. } => write!(f, "Keys"),
+            Resize { .. } => write!(f, "Resize"),
+            Scroll { .. } => write!(f, "Scroll"),
+            MouseMove { .. } => write!(f, "MouseMove"),
+            MousePress { .. } => write!(f, "MousePress"),
+            MouseRelease { .. } => write!(f, "MouseRelease"),
+            MenuSelect { .. } => write!(f, "MenuSelect"),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for IncomingRequest {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

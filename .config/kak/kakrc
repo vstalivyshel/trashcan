@@ -7,14 +7,6 @@ declare-option -hidden str glua "%val{config}/glua"
 # ------------------------------------------------------------------------------
 # Glua  ------------------------------------------------------------------------
 
-def glua-sock -override -params 1.. %{
-    try %{
-        eval -client GLUA %{ info -title SOCK "%arg{@}" }
-    } catch %{
-        echo -markup %{{Error}GLUA::ERR = Glua Client is not connected! }
-    }
-}
-
 def glua-lua -override -params 1.. %{
     try %{
         eval -client GLUA %{ info -title LUA "%arg{@}" }
@@ -23,9 +15,9 @@ def glua-lua -override -params 1.. %{
     }
 }
 
-def glua-exec -override -params 1.. %{
+def glua-eval -override -params 1.. %{
     try %{
-        eval -client GLUA %{ info -title EXEC "%arg{@}" }
+        eval -client GLUA %{ info -title EVAL "%arg{@}" }
     } catch %{
         echo -markup %{{Error}GLUA::ERR = Glua Client is not connected! }
     }
