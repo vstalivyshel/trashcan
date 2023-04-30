@@ -7,19 +7,11 @@ declare-option -hidden str glua "%val{config}/glua"
 # ------------------------------------------------------------------------------
 # Glua  ------------------------------------------------------------------------
 
-def glua-lua -override -params 1.. %{
+def glua-eval -override -params .. %{
     try %{
-        eval -client GLUA %{ info -title LUA "%arg{@}" }
+        eval -client GLUA %{ info -title %val{client} "%arg{@}" }
     } catch %{
-        echo -markup %{{Error}GLUA::ERR = Glua Client is not connected! }
-    }
-}
-
-def glua-eval -override -params 1.. %{
-    try %{
-        eval -client GLUA %{ info -title EVAL "%arg{@}" }
-    } catch %{
-        echo -markup %{{Error}GLUA::ERR = Glua Client is not connected! }
+        echo -markup %{{Error}GLUA::ERR: Glua Client is not connected! }
     }
 }
 

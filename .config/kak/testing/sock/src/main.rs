@@ -1,24 +1,29 @@
+#[macro_use]
 mod utils;
 mod kak_jsonrpc;
 mod lua;
 mod traits;
+mod kak_cmd;
 use kak_jsonrpc::IncomingRequest;
 use log::{debug, error, info};
 use lua::lua_exec;
+use std::fmt::Display;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::os::unix::net::UnixStream;
 use std::process::{self, Command, Stdio};
 use traits::*;
-use utils::{encode, send_to_kak_socket, conncet_to_kak_socket};
+use utils::send_to_kak_socket;
 
 struct GluaClient {
-    socket: UnixStream,
+    session: String,
     stdin: BufWriter<process::ChildStdin>,
     stdout: BufReader<process::ChildStdout>,
     output_buffer: Vec<u8>,
     stderr: Option<BufReader<process::ChildStderr>>,
 }
 
+// TODO: how to get values? options? registers? what is the best way?
+// TODO: get client list as iterator => create function that runs cmd in context of evry client
 impl GluaClient {
     fn connect(session: &str) -> Result<Self, io::Error> {
         let mut process = Command::new("kak")
@@ -28,21 +33,23 @@ impl GluaClient {
                 "-ui",
                 "json",
                 "-e",
-                "rename-client GLUA; e -scratch *glua-debug*",
+                "rename-client GLUA; e -scratch *scratch*",
             ])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::piped())
             .spawn()?;
 
-        let socket = conncet_to_kak_socket(session)?;
+        send_to_kak_socket(session, kak_cmd::session_prelude())?;
+
+        let session = session.to_string();
         let stdin = BufWriter::new(process.stdin.take().unwrap());
         let stdout = BufReader::new(process.stdout.take().unwrap());
         let output_buffer = Vec::<u8>::new();
         let stderr = Some(BufReader::new(process.stderr.take().unwrap()));
 
         Ok(Self {
-            socket,
+            session,
             stdin,
             stdout,
             output_buffer,
@@ -50,21 +57,8 @@ impl GluaClient {
         })
     }
 
-    fn send_to_socket(&mut self, msg: &str) -> Result<bool, io::Error> {
-        send_to_kak_socket("sock", msg)
-    }
-
-    fn writeln_kakbuf(&mut self, buffer: &str, msg: &str) -> Result<(), io::Error> {
-        let cmd = format! { "
-            eval -save-regs 'g' -client GLUA %[
-                try %[e -existing {buffer} ] catch %[e -scratch {buffer} ];
-                set-register 'g' \"{msg}\" ;
-                exec 'ge\"gP<a-o>' ;
-            ]"
-        };
-        self.send_to_socket(&cmd)?;
-
-        Ok(())
+    fn send_to_socket(&self, msg: &str) -> Result<(), io::Error> {
+        send_to_kak_socket(&self.session, msg)
     }
 
     fn read_request(&mut self) -> Result<IncomingRequest, serde_json::Error> {
@@ -100,26 +94,12 @@ fn run() {
                         ref content,
                         ..
                     } => {
-                        let title = title.collect_content();
-                        let content = content.collect_content();
+                        let client = title.collect_content();
+                        let chunk = content.collect_content();
 
-                        info!("InfoShow.title.content: \"{title}\"");
-                        info!("InfoShow.content.content: \"{content}\"");
+                        info!("InfoShow.title.content: \"{client}\"");
+                        info!("InfoShow.content.content: \"{chunk}\"");
                         debug!("InfoShow: \n{request:?}");
-
-                        if title.starts_with("EVAL") {
-                            // Msg must not be empty!
-                            match server.send_to_socket(&content) {
-                                Err(io_err) =>  {
-                                    error!("InfoShow::EVAL {io_err}");
-                                }
-                                Ok(is_written) => info!("InfoShow::Eval All msg written? {is_written}")
-                            }
-                        } else if title.starts_with("LUA") {
-                            if let Err(lua_err) = lua_exec(content) {
-                                error!("InfoShow::LUA: {lua_err}");
-                            }
-                        }
                     }
                     DrawStatus {
                         ref status_line,
@@ -143,3 +123,5 @@ fn main() {
     env_logger::init();
     run();
 }
+
+// eval -client client0 %{ eval -client GLUA %{ exec ":echo %val{bufname}|%val{session}<a-!><ret>" } }

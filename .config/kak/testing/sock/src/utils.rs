@@ -1,16 +1,16 @@
 use std::io::{self, Write};
 use std::os::unix::net::UnixStream;
 
-pub fn send_to_kak_socket(session: &str, msg: &str) -> Result<bool, io::Error> {
+pub fn send_to_kak_socket(session: &str, msg: &str) -> Result<(), io::Error> {
     let mut stream = conncet_to_kak_socket(&session)?;
-    let written_amount = stream.write(&encode(msg))?;
+    stream.write(&encode(msg))?;
     stream.flush()?;
 
-    Ok(written_amount == msg.len())
+    Ok(())
 }
 
 pub fn conncet_to_kak_socket(session: &str) -> Result<UnixStream, io::Error> {
-    // TODO: Need to handle this unwrap
+    // TODO: Need to handle a result
     let rntimedir = std::env::var("XDG_RUNTIME_DIR").expect("runtime path");
     let socket_path = std::path::Path::new(&rntimedir)
         .join("kakoune")
@@ -27,58 +27,4 @@ pub fn encode(msg: &str) -> Vec<u8> {
     result.insert(0, b'\x02');
 
     result
-}
-
-macro_rules! kak_var {
-    ($suf:expr, $op_ch:expr, $cl_ch:expr => $($var_name:expr)*) => {{
-		let mut vals = String::new();
-		$(
-    		vals.push('%');
-    		vals.push_str($suf);
-    		vals.push($op_ch);
-    		vals.push_str($var_name);
-    		vals.push($cl_ch);
-    		vals.push(' ');
-		)*
-		vals
-    }}
-}
-
-#[macro_export]
-macro_rules! arg {
-    ($($a:expr)*) => {
-        kak_var!("arg", '¿', '¿' => $($a)*)
-    };
-}
-
-#[macro_export]
-macro_rules! reg {
-    ($($a:expr)*) => {
-        kak_var!("reg", '£', '£' => $($a)*)
-    };
-}
-
-#[macro_export]
-macro_rules! val {
-    ($($a:expr)*) => {
-        kak_var!("val", '§', '§' => $($a)*)
-    };
-}
-
-#[macro_export]
-macro_rules! opt {
-    ($($a:expr)*) => {
-        kak_var!("opt", '¶', '¶' => $($a)*)
-    };
-}
-
-macro_rules! cmd {
-    ($($($a:expr)*);*) => {{
-        let mut cmd = String::new();
-        $(
-            $( cmd.push_str(&$a); cmd.push(' '); )*
-            cmd.push_str("; ");
-        )*
-        cmd
-    }};
 }
