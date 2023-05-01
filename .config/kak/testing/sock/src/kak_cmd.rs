@@ -1,225 +1,147 @@
-use std::fmt::Display;
+pub const SELF: &str = "GLUA";
+pub const MAIN_COMMAND: &str = "glua-eval";
+pub const VAL_HANDLER: &str = "glua_val_handler";
+pub const VAL_HANDLER_DEL: &str = "§";
 
-const SELF: &str = "GLUA";
-const COMMAND: &str = "glua-eval";
-const VAL_HANDLER: &str = "glua_val_handler";
-const BLOCK_Q: [&str; 2] = ["%[", "]"];
+pub const CMD_DEL: &str = "; ";
 
-pub struct ClientCmd {
-    pub name: String,
-}
+pub const SET: &str = "set-option";
+pub const SET_ADD: &str = "set-option -add";
+pub const SET_REG: &str = "set-register";
+pub const DEF: &str = "define-command";
+pub const EVAL: &str = "evaluate-commands";
+pub const DECL: &str = "declare-option";
+pub const INFO: &str = "info";
+pub const EXEC: &str = "execute-keys";
+pub const TRY_CATCH: [&str; 2] = ["try", "catch"];
 
-impl ClientCmd {
-    pub fn new<S: ToString>(name: S) -> Self {
-        Self {
-            name: name.to_string(),
-        }
-    }
+pub const GLOB: &str = "global";
 
-    pub fn exec<S: Display>(&self, keys: S) -> String {
-        let exec_cmd = format!("exec {keys}", keys = qt(keys));
-        self.eval(&exec_cmd, err("Exec-Keys Failed", &exec_cmd))
-    }
+pub const NOP: &str = "''";
+pub const NIL: &str = "nil";
 
-    pub fn echo<S: Display>(&self, msg: S) -> String {
-        let echo_cmd = format!("echo {msg}");
-        self.eval(&echo_cmd, err("Echo Failed", &echo_cmd))
-    }
-
-    pub fn info<D: Display, S: Display>(&self, title: D, msg: S) -> String {
-        let info_cmd = format!("info -title {title} {msg}", msg = dqt(msg));
-        self.eval(&info_cmd, err("InfoShow Failed", &info_cmd))
-    }
-
-    pub fn eval<D: Display, S: Display>(&self, cmd: D, err_cmd: S) -> String {
-        format!(
-            "eval -client {client} {cmd}",
-            client = self.name,
-            cmd = kakqt(try_catch(cmd, err_cmd))
-        )
-    }
-}
-
-fn writeln_kakbuf(buffer: &str, msg: &str) -> String {
-    let open_buf = try_eval(
-        try_catch(
-            format!("e -existing {buffer}"),
-            format!("e -scratch {buffer}"),
-        ),
-        "Failed to edit a buffer for command output",
-    );
-
-    let set_reg = try_eval(
-        format!("set-register 'g' {msg}", msg = dqt(msg)),
-        "Failed to set content to a register while writing to a buffer",
-    );
-
-    let exec = try_eval(
-        "exec 'gegh\"gP<a-o>'",
-        "Failed to paste content into a buffer",
-    );
-
-    format!("eval -save-regs 'g' -client GLUA %[ {open_buf}; {set_reg}; {exec}; ]")
+#[macro_export]
+macro_rules! fmt {
+    ($($a:expr)*) => {{
+        let mut nice = String::new();
+        $(
+        nice.push_str($a.as_ref());
+        nice.push(' ');
+        )*
+        nice
+    }}
 }
 
 pub fn server_prelude() -> String {
-    let decl_handler = try_eval(
-        format!("declare-option -hidden str {VAL_HANDLER}"),
-        "Failed to decalre main value handler for server!",
-    );
-
-    let def_main = try_def(
-        format!("{COMMAND} -override -params .."),
-        format!(
-            "eval -client {SELF} %[ info -title {client} {content} ]",
-            client = val("client"),
-            content = arg("@")
+    [
+        fmt!(DECL "-hidden str" VAL_HANDLER),
+        cmd(
+            fmt!(DEF MAIN_COMMAND "-override -params .."),
+            cmd(
+                fmt!(EVAL "-client" SELF),
+                fmt!(INFO "-title" "client".as_val() "@".as_arg().dqt()),
+            ),
         ),
-        "Failed to define main server command!",
-    );
-
-    format!("{decl_handler}; {def_main}")
+    ]
+    .join(CMD_DEL)
 }
 
-pub fn set_val_handler<S: Display, I: IntoIterator<Item = S>>(vars: I) -> String {
-    let set_add = format!("set -add global {VAL_HANDLER}");
-    let set_nil = format!("{set_add} 'nil'");
-    let mut cmd = String::new();
-    for var in vars.into_iter() {
-        let set_cmd = format!("{set_add} {var}");
-        cmd.push_str(&try_catch(
-            &set_cmd,
-            try_catch(&set_nil, err("Set-Option Failed", &set_cmd)),
-        ));
-        cmd.push_str(&format!(" {set_add} '§'; "));
+pub fn set_val_handler<S, I>(vars: I) -> String
+where
+    S: KakCmd,
+    I: IntoIterator<Item = S>,
+{
+    [
+        fmt!(SET GLOB VAL_HANDLER NOP),
+        vars.into_iter()
+            .map(|var| {
+                try_catch(
+                    fmt!(SET_ADD GLOB VAL_HANDLER var.and(VAL_HANDLER_DEL).dqt()),
+                    fmt!(SET_ADD GLOB VAL_HANDLER NIL.and(VAL_HANDLER_DEL).qt()),
+                )
+                .and(CMD_DEL)
+            })
+            .collect::<String>(),
+    ]
+    .join(CMD_DEL)
+}
+
+pub fn extract_val_handler(values: String) -> Vec<String> {
+    values
+        .split_terminator(VAL_HANDLER_DEL)
+        .map(|val| val.to_string())
+        .collect::<Vec<String>>()
+}
+
+pub fn writeln_kakbuf<S: KakCmd>(buffer: S, msg: S) -> String {
+    let buffer = buffer.qt();
+    [
+        try_catch(fmt!["edit -existing" buffer], fmt!["edit -scratch" buffer]),
+        fmt![SET_REG "g".qt() msg.dqt()],
+        fmt![EXEC "gegh\"gP<a-o>".qt()],
+    ]
+    .join(CMD_DEL)
+}
+
+pub fn cmd<S: KakCmd>(cmd_args: S, block: S) -> String {
+    fmt!(cmd_args block.kakqt())
+}
+
+pub fn try_catch<S: KakCmd>(try_cmd: S, catch_cmd: S) -> String {
+    fmt!(TRY_CATCH[0] try_cmd.kakqt() TRY_CATCH[1] catch_cmd.kakqt())
+}
+
+pub trait KakCmd: AsRef<str> {
+    fn sur_with(&self, op: &str, cl: &str) -> String {
+        let mut val = String::new();
+        val.push_str(op);
+        val.push_str(self.as_ref());
+        val.push_str(cl);
+
+        val
     }
 
-    format!(" set gloabl {VAL_HANDLER} ''; {cmd}")
-}
+    fn and<S: KakCmd>(&self, more: S) -> String {
+        let mut new = String::new();
+        new.push_str(self.as_ref());
+        new.push_str(more.as_ref());
 
-pub fn try_def<D: Display, S: Display, E: Display>(command: D, block: S, err_msg: E) -> String {
-    try_eval(
-        format!("define-command {command} {block}", block = kakqt(block)),
-        err_msg,
-    )
-}
-
-pub fn try_eval<D: Display, S: Display>(cmd: D, err_msg: S) -> String {
-    try_catch(&cmd, err(err_msg, &cmd))
-}
-
-pub fn try_catch<D: Display, S: Display>(try_cmd: D, catch_cmd: S) -> String {
-    format!(
-        "try {try_cmd} catch {catch_cmd}",
-        try_cmd = kakqt(try_cmd),
-        catch_cmd = kakqt(catch_cmd)
-    )
-}
-
-pub fn err<D: Display, S: ToString>(err_msg: D, ctx: S) -> String {
-    let ctx_pretty = debug_kakcmd(ctx.to_string());
-    format!(
-        "\
-echo -debug {SELF}::KakErr: {kak_err}; \
-echo -debug {SELF}::Debug: Err somewhere here >>; \
-{ctx_pretty}\
-fail {SELF}::Err: {err_msg}, see debug;",
-        err_msg = qt(err_msg),
-        kak_err = dqt("%val{error}"),
-    )
-}
-
-pub fn with_dqt<S: Display>(val: S) -> String {
-    format!("\\\'{val}\\\'")
-}
-
-pub fn arg<S: Display>(val: S) -> String {
-    format!("%arg¿{val}¿")
-}
-
-pub fn reg<S: Display>(val: S) -> String {
-    format!("%reg£{val}£")
-}
-
-pub fn val<S: Display>(val: S) -> String {
-    format!("%val®{val}®")
-}
-
-pub fn opt<S: Display>(val: S) -> String {
-    format!("%opt¶{val}¶")
-}
-
-pub fn qt<S: Display>(val: S) -> String {
-    format!("'{val}'")
-}
-
-pub fn dqt<S: Display>(val: S) -> String {
-    format!("\"{val}\"")
-}
-
-pub fn kakqt<S: Display>(val: S) -> String {
-    format!("%[ {val} ]")
-}
-
-fn debug_kakcmd<S: ToString>(ctx: S) -> String {
-    fn push_line(depth: usize, line: &mut String, lines: &mut Vec<String>) {
-        lines.push(format!("echo -debug %{{{line}}};"));
-        line.clear();
-        let indent_newline = "  ";
-        if depth > 0 {
-            for _ in 0..=depth {
-                line.push_str(indent_newline);
-            }
-        }
+        new
     }
 
-    let mut ctx = ctx.to_string();
-    let mut depth = 0 as usize;
-    let mut words = ctx.split_whitespace();
-
-    let block_open = BLOCK_Q[0];
-    let block_close = BLOCK_Q[1];
-
-    let mut line = String::new();
-    let mut lines = Vec::<String>::new();
-
-    for (idx, word) in words.clone().enumerate() {
-        if word.contains(block_open) {
-            depth += 1;
-            line.push_str(word);
-            push_line(depth, &mut line, &mut lines);
-        } else if word.contains(block_close) {
-            // This doesn't work
-            // if let Some(keyword) = words.nth(idx + 1) {
-            //     if keyword.contains("catch") {
-            //         line.push_str(word);
-            //         line.push(' ');
-            //         continue;
-            //     }
-            // }
-            depth -= 1;
-            push_line(depth, &mut line, &mut lines);
-            line.push_str(word);
-            push_line(depth, &mut line, &mut lines);
-        } else if word.contains(';') {
-            line.push_str(word);
-            push_line(depth, &mut line, &mut lines);
-        } else {
-            line.push_str(word);
-            line.push(' ');
-        }
+    fn as_arg(&self) -> String {
+        self.sur_with("%arg¿", "¿")
     }
-	lines.join("\n")
+
+    fn as_reg(&self) -> String {
+        self.sur_with("%reg£", "£")
+    }
+
+    fn as_val(&self) -> String {
+        self.sur_with("%val®", "®")
+    }
+
+    fn as_opt(&self) -> String {
+        self.sur_with("%opt¶", "¶")
+    }
+
+    fn qt(&self) -> String {
+        self.sur_with("'", "'")
+    }
+
+    fn dqt(&self) -> String {
+        self.sur_with("\"", "\"")
+    }
+
+    fn kakqt(&self) -> String {
+        self.sur_with("%[ ", " ]")
+    }
+
+    fn catch_err<S: KakCmd>(&self, err_cmd: S) -> String {
+        try_catch(self.as_ref(), err_cmd.as_ref())
+    }
 }
 
-fn main() {
-    let glua = ClientCmd::new("GLUA");
-    let cmd = set_val_handler([opt("suka"), val("blyad"), dqt("some text in dqt")]);
-    let prelude = server_prelude();
-    let write_buf = writeln_kakbuf("some_buffer", "this is msg\nfor some buffer\ntyes, no, uska blyad");
-    // println!("{}", try_eval("echo %val{session}", "FAiled to session"))
-    // debug_cmd(&cmd);
-    // println!("{write_buf}");
-    println!("{}", debug_kakcmd(&write_buf));
-}
+impl KakCmd for String {}
+impl KakCmd for &str {}
 
