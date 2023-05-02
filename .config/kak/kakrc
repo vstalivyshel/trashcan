@@ -5,17 +5,6 @@ colorscheme lotus
 declare-option -hidden str glua "%val{config}/glua"
 
 # ------------------------------------------------------------------------------
-# Glua  ------------------------------------------------------------------------
-
-def glua-eval -override -params .. %{
-    try %{
-        eval -client GLUA %{ info -title %val{client} "%arg{@}" }
-    } catch %{
-        echo -markup %{{Error}GLUA::ERR: Glua Client is not connected! }
-    }
-}
-
-# ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
 add-highlighter -override global/ number-lines -relative -hlcursor -separator ' '

@@ -1,31 +1,32 @@
 #[macro_use]
 mod utils;
+mod kak_cmd;
 mod kak_jsonrpc;
 mod lua;
 mod traits;
-mod kak_cmd;
-use kak_jsonrpc::IncomingRequest;
+use crate::lua::{LuaState, Lua, Operation};
+use crate::kak_cmd::{SELF, Cmd};
+use crate::kak_jsonrpc::IncomingRequest;
+use crate::traits::*;
+use crate::utils::send_to_kak_socket;
 use log::{debug, error, info};
-use lua::lua_exec;
 use std::fmt::Display;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::os::unix::net::UnixStream;
 use std::process::{self, Command, Stdio};
-use traits::*;
-use utils::send_to_kak_socket;
 
-struct GluaClient {
-    session: String,
-    stdin: BufWriter<process::ChildStdin>,
-    stdout: BufReader<process::ChildStdout>,
-    output_buffer: Vec<u8>,
-    stderr: Option<BufReader<process::ChildStderr>>,
+pub struct GluaClient {
+    pub session: String,
+    pub stdin: BufWriter<process::ChildStdin>,
+    pub stdout: BufReader<process::ChildStdout>,
+    pub output_buffer: Vec<u8>,
+    pub stderr: Option<BufReader<process::ChildStderr>>,
 }
 
 // TODO: how to get values? options? registers? what is the best way?
 // TODO: get client list as iterator => create function that runs cmd in context of evry client
 impl GluaClient {
-    fn connect(session: &str) -> Result<Self, io::Error> {
+    pub fn connect(session: &str) -> Result<Self, io::Error> {
         let mut process = Command::new("kak")
             .args([
                 "-c",
@@ -40,7 +41,7 @@ impl GluaClient {
             .stdin(Stdio::piped())
             .spawn()?;
 
-        send_to_kak_socket(session, kak_cmd::session_prelude())?;
+        send_to_kak_socket(session, &kak_cmd::session_prelude())?;
 
         let session = session.to_string();
         let stdin = BufWriter::new(process.stdin.take().unwrap());
@@ -57,11 +58,11 @@ impl GluaClient {
         })
     }
 
-    fn send_to_socket(&self, msg: &str) -> Result<(), io::Error> {
+    pub fn send_to_socket(&self, msg: &str) -> Result<(), io::Error> {
         send_to_kak_socket(&self.session, msg)
     }
 
-    fn read_request(&mut self) -> Result<IncomingRequest, serde_json::Error> {
+    pub fn read_request(&mut self) -> Result<IncomingRequest, serde_json::Error> {
         self.stdout
             .read_until(b'\n', &mut self.output_buffer)
             .expect("read json output");
@@ -73,7 +74,28 @@ impl GluaClient {
 }
 
 fn run() {
-    let mut server = GluaClient::connect("sock").expect("spawn json client");
+    let session = match std::env::args().skip(1).next() {
+        Some(s) => s,
+        None => {
+            eprintln!("{SELF}::Err: Session name is not specified");
+            process::exit(69);
+        },
+    };
+    let mut server = match GluaClient::connect(&session) {
+        Ok(serv) => serv,
+        Err(io_err) => {
+            eprintln!("{SELF}::Err: Failed to spawn client: {io_err}");
+            process::exit(69);
+        }
+    };
+
+    let lua = match Lua::init_state() {
+        Ok(l) => l,
+        Err(lua_err) => {
+            eprintln!("{SELF}::Err: Failed to init Lua State: {lua_err}");
+            process::exit(69);
+        }
+    };
 
     loop {
         match server.read_request() {
@@ -100,6 +122,29 @@ fn run() {
                         info!("InfoShow.title.content: \"{client}\"");
                         info!("InfoShow.content.content: \"{chunk}\"");
                         debug!("InfoShow: \n{request:?}");
+
+                        if chunk.is_empty() {
+                            continue;
+                        }
+
+                        match lua.eval_and_get_ops(chunk) {
+                            Ok(ops) => {
+                                for op in ops.iter() {
+                                    use Operation::*;
+                                    match op {
+                                        RawEval(cmd) => log::info!("LUA: Requested raw evaluation: {cmd}"),
+                                        ToSocket(ses_name, cmd) => log::info!("LUA: Req to socket {ses_name} cmd: {cmd}"),
+                                    }
+                                }
+                            }
+                            Err(lua_err) => {
+                                server.send_to_socket(&kak_cmd::throw_error(
+                                    &client,
+                                    "Err executing lua chunk! See debug",
+                                    lua_err.to_string(),
+                                )).expect("send lua error to socket");
+                            }
+                        }
                     }
                     DrawStatus {
                         ref status_line,
@@ -123,5 +168,3 @@ fn main() {
     env_logger::init();
     run();
 }
-
-// eval -client client0 %{ eval -client GLUA %{ exec ":echo %val{bufname}|%val{session}<a-!><ret>" } }
