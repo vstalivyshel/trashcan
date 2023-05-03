@@ -1,8 +1,14 @@
-colorscheme lotus
+colorscheme rose-pine
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
 declare-option -hidden str glua "%val{config}/glua"
+def lua -params 2 %{
+	set client_hand %val{client}
+	eval -client GLUA %{
+    	info -title "%opt{client}&%arg{1}" "%arg{2}"
+	}
+}
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -93,15 +99,6 @@ map global user M ':make-color-current-file<ret>' \
 # ------------------------------------------------------------------------------
 # splits ----------------------------------------------------------------------
 
-def surround-selection-custom \
--override \
-%{prompt  'Custom-sur-obj: ' %{
-    eval -save-regs 'cz' %{
-        set-register c %val{text}
-        exec -draft -itersel 'Z"cPz"cpz'
-    }
-} }
-
 declare-user-mode window-mode
 map global normal <c-w> ":enter-user-mode window-mode<ret>"
 
@@ -177,6 +174,15 @@ def jump-to-mark \
 -override \
 %{ on-key %{ try %{ exec %sh{ printf "\"%sz" "$kak_key" } } } }
 map global normal \' ":jump-to-mark<ret>"
+
+def surround-selection-custom \
+-override \
+%{prompt  'Custom-sur-obj: ' %{
+    eval -save-regs 'cz' %{
+        set-register c %val{text}
+        exec -draft -itersel 'Z"cPz"cpz'
+    }
+} }
 
 def surround-selection \
 -override \

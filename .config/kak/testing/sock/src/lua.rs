@@ -1,74 +1,100 @@
-use crate::kak_cmd;
-use crate::kak_cmd::SELF;
-use crate::utils::send_to_kak_socket;
-use crate::GluaClient;
+use crate::send_to_kak_socket;
 pub use mlua::Lua;
-use mlua::{ChunkMode, FromLua, Function, Result, Table, UserData, Value, Variadic};
+use mlua::{Result, Table};
 
-const OPS_TABLE: &str = "operations_stack";
+pub const KAK: &str = "kak";
+pub const META: &str = "META";
 
-#[derive(Clone)]
-pub enum Operation {
-    RawEval(String),
-    ToSocket(String, String),
-    Nop,
+pub enum Prefix {
+    Opt,
+    Val,
+    Arg,
+    Reg,
 }
 
-impl UserData for Operation {}
-
-pub trait LuaState {
-    fn init_state() -> Result<Lua>;
-    fn eval_and_get_ops(&self, chunk: String) -> Result<Vec<Operation>>;
+trait LuaServer {
+    fn current_session(&self) -> Result<String>;
+    fn current_client(&self) -> Result<String>;
+    fn set_client(&self, client: String) -> Result<()>;
+    fn session_data(&self) -> Result<Table>;
 }
 
-impl LuaState for Lua {
-    fn init_state() -> Result<Lua> {
-        let state = Lua::new();
-        let globals = state.globals();
+impl LuaServer for Lua {
+    fn current_session(&self) -> Result<String> {
+        self.session_data()?.get::<_, String>("session")
+    }
 
-        let user_stuff = state.create_table()?;
-        let ops_table = state.create_table()?;
-        let funcs = state.create_table()?;
+    fn current_client(&self) -> Result<String> {
+        self.session_data()?.get::<_, String>("client")
+    }
 
-        funcs.set(
-            "raw_eval",
-            state.create_function(|lua, cmd: String| {
-                lua.globals()
-                    .get::<_, Table>(OPS_TABLE)?
-                    .push(Operation::RawEval(cmd))?;
+    fn set_client(&self, client: String) -> Result<()> {
+        self.session_data()?.set("client", client)
+    }
+
+    fn session_data(&self) -> Result<Table> {
+        self.globals().get::<_, Table>(KAK)?.get::<_, Table>(META)
+    }
+}
+
+pub fn lua_prelude(session: &str) -> Result<Lua> {
+    let lua = Lua::new();
+    {
+        let globals = lua.globals();
+        let kak = lua.create_table()?;
+        let meta = lua.create_table()?;
+        meta.set("session", session.to_string())?;
+
+        kak.set(META, session.to_string())?;
+
+        // kak.set(
+        //     "val",
+        //     lua.create_function(|lua, vals: Variadic<String>| {
+        //     })?,
+        // )?;
+
+        // kak.set(
+        //     "opt",
+        //     lua.create_function(|lua, vals: Variadic<String>| {
+        //     })?,
+        // )?;
+
+        // kak.set(
+        // "reg",
+        // lua.create_function(|lua, vals: Variadic<String>| {
+        // })?,
+        // )?;
+
+        // kak.set(
+        //     "arg",
+        //     lua.create_function(|lua, vals: Variadic<String>| {
+        //     })?,
+        // )?;
+
+        // kak.set(
+        //     "eval",
+        //     lua.create_function(|lua, cmd: String| {
+        //     })?,
+        // )?;
+
+        kak.set(
+            "send",
+            lua.create_function(|lua, msg: String| {
+                send_to_kak_socket(&lua.current_session()?, &msg)?;
                 Ok(())
             })?,
         )?;
 
-        funcs.set(
-            "send_to",
-            state.create_function(|lua, (ses, msg): (String, String)| {
-                lua.globals()
-                    .get::<_, Table>(OPS_TABLE)?
-                    .push(Operation::ToSocket(ses, msg))?;
-                Ok(())
-            })?,
-        )?;
+        // kak.set(
+        //     "send_to",
+        //     lua.create_function(|lua, (ses, msg): (String, String)| {
+        //         send_to_kak_socket(&ses, &msg)?;
+        //         Ok(())
+        //     })?,
+        // )?;
 
-        funcs.set(OPS_TABLE, ops_table)?;
-        funcs.set("user", user_stuff)?;
-
-        globals.set("kak", funcs)?;
-        drop(globals);
-
-        Ok(state)
+        globals.set("kak", kak)?;
     }
 
-    fn eval_and_get_ops(&self, chunk: String) -> Result<Vec<Operation>> {
-        self.load(&chunk).into_function()?;
-        // TODO: Load chunck as functions that returns table with Operations
-        // 		Table will have at least one item: Nop
-        // 		Better idea?
-        let ops = self.globals().get::<_, Table>(OPS_TABLE)?;
-
-        Ok(ops.sequence_values().map(|op| op.unwrap()).collect::<Vec<Operation>>())
-    }
+    Ok(lua)
 }
-
-// glua-eval 'kak.raw_eval("hello world")'
-// glua-eval 'kak.send_to("sock", "msg")'

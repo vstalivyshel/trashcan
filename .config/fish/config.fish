@@ -1,8 +1,3 @@
-set LP (echo (lua -e '
-    local p = os.getenv("HOME") .. "/.mylua/?.lua;" 
-    print(p .. package.path)
-' ))
-
 if status is-interactive
     fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin $HOME/.local/scr
     fish_add_path /home/linuxbrew/.linuxbrew/opt/clang-format/bin
@@ -18,7 +13,6 @@ if status is-interactive
 
     set -g FZF_DEFAULT_COMMAND fd --hidden
     set -g PYTHONDONTWRITEBYTECODE 1
-    set -gx LUA_PATH $LP
 
     alias up='sudo dnf update -y; rustup update; brew upgrade'
     alias dfs="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME"
