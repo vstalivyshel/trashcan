@@ -57,59 +57,29 @@ pub fn session_prelude() -> String {
     .as_cmd()
 }
 
-pub fn request_values<A: Cmd, B: Cmd>(pref: Prefix, client: A, vars: B) -> String {
+pub fn request_value<A: Cmd , B: IntoIterator<Item=A>>(pref: Prefix, vars: B) -> String {
     use Prefix::*;
-    let vars = match pref {
-        Val => vars.as_val(),
-        Arg => vars.as_arg(),
-        Opt => vars.as_opt(),
-        Reg => vars.as_reg(),
-    };
+    let vars = vars.into_iter().map(|v| {
+        match pref {
+            Val => v.as_val().and(VAL_SEP),
+            Arg => v.as_arg().and(VAL_SEP),
+            Opt => v.as_opt().and(VAL_SEP),
+            Reg => v.as_reg().and(VAL_SEP),
+        }
+    }).collect::<String>();
 
-    f!(EVACL client).block([
+    [
         f!(SET GLOB VAL_HANDLER NOP),
         f!(SET_ADD GLOB VAL_HANDLER vars.dqt()),
         f!(EVACL SELF).and_kakqt(f!(INFO VAL_HANDLER.as_opt().dqt())),
-    ])
+    ].as_cmd()
 }
 
-pub fn extract_values(values: String) -> Vec<String> {
-    values
-        .split_terminator(VAL_SEP)
-        .map(|val| val.to_string())
-        .collect::<Vec<String>>()
-}
-
-pub fn try_request_values<S, I>(vars: I) -> String
-where
-    S: Cmd,
-    I: IntoIterator<Item = S>,
-{
+pub fn throw_error<B: Cmd, C: Cmd>(fail_msg: B, error: C) -> String {
     [
-        f!(SET GLOB VAL_HANDLER NOP),
-        vars.into_iter()
-            .map(|var| {
-                try_catch(
-                    f!(SET_ADD GLOB VAL_HANDLER var.and(VAL_SEP).dqt()),
-                    f!(SET_ADD GLOB VAL_HANDLER NIL.and(VAL_SEP).qt()),
-                )
-                .and(CMD_DEL)
-            })
-            .collect::<String>(),
-        f!(EVACL SELF).and(f!(INFO "-title VALS" VAL_HANDLER.as_opt().dqt())), // f!(MAIN_COMMAND VAL_HANDLER.as_opt().dqt()),
-    ]
-    .as_cmd()
-}
-
-pub fn eval_self<S: Cmd, I: IntoIterator<Item = S>>(cmds: I) -> String {
-    f!(EVACL SELF cmds.kakqt())
-}
-
-pub fn throw_error<A: Cmd, B: Cmd, C: Cmd>(client: A, fail_msg: B, error: C) -> String {
-    f!(EVACL client).block([
         f!(ECHO "-markup" "{Error}".and(fail_msg).kakqt()),
         f!(ECHO_DBG SELF.and("::ERR ").and(error.dqt()).kakqt()),
-    ])
+    ].as_cmd()
 }
 
 pub fn writeln_kakbuf<S: Cmd>(buffer: S, msg: S) -> String {

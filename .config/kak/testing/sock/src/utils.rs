@@ -1,8 +1,8 @@
 use crate::kak_cmd::SELF;
 use serde::{Deserialize, Serialize};
-use std::io::{self, BufReader, Write};
+use std::io::{self, BufReader, BufRead, Write};
 use std::os::unix::net::UnixStream;
-use std::process::Stdio;
+use std::process::{ChildStdout, Stdio};
 
 type Line = Vec<Atom>;
 
@@ -60,6 +60,14 @@ pub struct JsonRpc {
     pub jsonrpc: String,
     pub method: String,
     pub params: InfoShow,
+}
+
+pub fn read_response(stream: &mut BufReader<ChildStdout>, output_buffer: &mut Vec<u8>) -> Result<JsonRpc, serde_json::Error> {
+    let _ = stream.read_until(b'\n', output_buffer);
+    let response = serde_json::from_slice::<JsonRpc>(&output_buffer)?;
+    output_buffer.clear();
+
+	Ok(response)
 }
 
 pub fn send_to_kak_socket(session: &str, msg: &str) -> Result<(), io::Error> {
