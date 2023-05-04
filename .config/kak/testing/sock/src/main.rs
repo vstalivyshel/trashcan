@@ -3,67 +3,41 @@ mod lua;
 mod kak_cmd;
 mod utils;
 use crate::kak_cmd::{Cmd, EVACL, EXEC, SELF};
-use crate::lua::{lua_prelude, Lua};
+use crate::lua::{lua_prelude, LuaServer};
 use crate::utils::*;
-use log::{debug, info};
-use std::io::BufRead;
+use log::{debug, error, info};
+use std::io::{BufRead, BufReader};
+use std::process::{self, Stdio};
 
-struct GluaClient {
-    session: String,
-    lua_state: Lua,
-    stream: std::io::BufReader<std::process::ChildStdout>,
-    output_buffer: Vec<u8>,
-}
-
-impl GluaClient {
-    fn connect(session: &str) -> Self {
-        let lua_state = lua_prelude(session)
-            .map_err(|lua_err| {
-                fuck(&f!("Lua State failed to initialize:" lua_err.to_string().dqt()))
-            })
-            .unwrap();
-
-        let stream = connect_to(session)
-            .map_err(|io_err| {
-                fuck(&f!("Failed to connect to the kakoune session:" io_err.to_string().dqt()))
-            })
-            .unwrap();
-
-        let output_buffer = Vec::<u8>::new();
-
-        Self {
-            session: session.to_string(),
-            lua_state,
-            stream,
-            output_buffer,
-        }
-    }
-
-    fn send_to_socket(&self, msg: &str) {
-        let _ = send_to_kak_socket(&self.session, msg);
-    }
-
-    fn read_request(&mut self) -> Result<JsonRpc, serde_json::Error> {
-        self.stream
-            .read_until(b'\n', &mut self.output_buffer)
-            .expect("read json output");
-        let inc_req = serde_json::from_slice::<JsonRpc>(&self.output_buffer);
-        self.output_buffer.clear();
-
-        inc_req
-    }
-}
-
-fn run() {
+fn run() -> Result<(), mlua::Error> {
     let session = std::env::args().skip(1).next();
     if session.is_none() {
-        fuck("No session name supplied");
+        eprintln!("No session name supplied");
+        process::exit(69)
     }
+    let session = session.unwrap();
 
-    let mut server = GluaClient::connect(&session.unwrap());
+    let mut json_client = std::process::Command::new("kak")
+        .args([
+            "-c",
+            &session,
+            "-ui",
+            "json",
+            "-e",
+            &f!("rename-client" SELF "; e -scratch *scratch*"),
+        ])
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    let mut stream = BufReader::new(json_client.stdout.take().unwrap());
+    let mut output_buffer = Vec::<u8>::new();
+
+    let lua = lua_prelude(&session).unwrap();
 
     loop {
-        let received = server.read_request();
+        stream.read_until(b'\n', &mut output_buffer)?;
+        let received = serde_json::from_slice::<JsonRpc>(&output_buffer);
+        output_buffer.clear();
 
         if let Err(parse_err) = received {
             if parse_err.is_eof() {
@@ -73,7 +47,7 @@ fn run() {
         }
 
         let info = received.unwrap().params;
-        server.send_to_socket(&f!(EVACL SELF).and_kakqt(f!(EXEC "<esc>")));
+        lua.send_current_session(&f!(EVACL SELF).and_kakqt(f!(EXEC "<esc>")))?;
 
         let chunck = info.content();
         if chunck.is_empty() {
@@ -81,17 +55,29 @@ fn run() {
         }
 
         let client = info.title_content();
+        lua.set_client(&client)?;
 
         info!("InfoShow.title.content: \"{client}\"");
         info!("InfoShow.content.content: \"{chunck}\"");
         debug!("InfoShow: \n{info:?}");
 
-        // info!("Request from client: \"{client}\"");
-        // info!("With arguments: {args:?}");
+        if let Err(lua_err) = lua.chunck_eval(&chunck) {
+            error!("Lua::Error: \n{lua_err}");
+            lua.send_current_session(&kak_cmd::throw_error(
+                &client,
+                "Error executing lua chunck! See debug",
+                lua_err.to_string(),
+            ))?;
+        }
     }
+
+    Ok(())
 }
 
 fn main() {
     env_logger::init();
-    run();
+    if let Err(lua_err) = run() {
+        eprintln!("{SELF}::LuaError: {lua_err}");
+        std::process::exit(69);
+    };
 }

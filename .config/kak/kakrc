@@ -1,4 +1,4 @@
-colorscheme rose-pine
+colorscheme lotus
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
@@ -183,6 +183,7 @@ def surround-selection-custom \
         exec -draft -itersel 'Z"cPz"cpz'
     }
 } }
+map global user \' ":surround-selection-custom<ret>"
 
 def surround-selection \
 -override \

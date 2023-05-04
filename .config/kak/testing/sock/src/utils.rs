@@ -1,4 +1,3 @@
-use crate::f;
 use crate::kak_cmd::SELF;
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufReader, Write};
@@ -63,31 +62,10 @@ pub struct JsonRpc {
     pub params: InfoShow,
 }
 
-pub fn fuck(err: &str) {
-    eprintln!("{SELF}::Error: {}", err);
-    std::process::exit(69);
-}
-
-pub fn connect_to(session: &str) -> Result<BufReader<std::process::ChildStdout>, io::Error> {
-    let mut process = std::process::Command::new("kak")
-        .args([
-            "-c",
-            session,
-            "-ui",
-            "json",
-            "-e",
-            &f!("rename-client" SELF "; e -scratch *scratch*"),
-        ])
-        .stdout(Stdio::piped())
-        .spawn()?;
-
-    Ok(BufReader::new(process.stdout.take().unwrap()))
-}
-
 pub fn send_to_kak_socket(session: &str, msg: &str) -> Result<(), io::Error> {
     let rntm = std::env::var("XDG_RUNTIME_DIR").expect("runtimedir");
     let socket = std::path::PathBuf::from(rntm).join("kakoune").join(session);
-    let mut stream = UnixStream::connect(&session)?;
+    let mut stream = UnixStream::connect(socket)?;
     stream.write(&encode(msg))?;
     stream.flush()?;
 

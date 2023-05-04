@@ -24,6 +24,13 @@ pub const GLOB: &str = "global";
 pub const NOP: &str = "''";
 pub const NIL: &str = "nil";
 
+pub enum Prefix {
+    Opt,
+    Val,
+    Arg,
+    Reg,
+}
+
 #[macro_export]
 macro_rules! f {
     ($($a:expr)*) => {{
@@ -43,23 +50,22 @@ pub fn session_prelude() -> String {
         f!(decl CLIENT_HANDLER),
         f!(DEF MAIN_COMMAND "-override -params 1..").block([
             f!(SET GLOB CLIENT_HANDLER "client".as_val()),
-            f!(EVACL SELF).and_kakqt(
-                f!(INFO "-title" CLIENT_HANDLER.as_opt() "@".as_arg().dqt())
-            ),
+            f!(EVACL SELF).and_kakqt(f!(INFO "-title" CLIENT_HANDLER.as_opt() "@".as_arg().dqt())),
         ]),
         f!("alias" GLOB "lua" MAIN_COMMAND),
     ]
     .as_cmd()
 }
 
-pub enum Prefix {
-    Opt,
-    Val,
-    Arg,
-    Reg,
-}
-
 pub fn request_values<A: Cmd, B: Cmd>(pref: Prefix, client: A, vars: B) -> String {
+    use Prefix::*;
+    let vars = match pref {
+        Val => vars.as_val(),
+        Arg => vars.as_arg(),
+        Opt => vars.as_opt(),
+        Reg => vars.as_reg(),
+    };
+
     f!(EVACL client).block([
         f!(SET GLOB VAL_HANDLER NOP),
         f!(SET_ADD GLOB VAL_HANDLER vars.dqt()),
