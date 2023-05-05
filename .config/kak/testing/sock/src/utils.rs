@@ -1,73 +1,20 @@
-use crate::kak_cmd::SELF;
-use serde::{Deserialize, Serialize};
-use std::io::{self, BufReader, BufRead, Write};
+use regex::Regex;
+use std::ffi::CString;
+use std::ffi::OsStr;
+use std::io::{self, Write};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::net::UnixStream;
-use std::process::{ChildStdout, Stdio};
+use std::path::Path;
 
-type Line = Vec<Atom>;
+pub fn create_fifo<P: AsRef<Path>>(path: &P, mode: libc::mode_t) -> io::Result<()> {
+    let path = CString::new(path.as_ref().as_os_str().as_bytes())?;
+    let fine = unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr() as *const _, mode) == 0 };
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Face {
-    pub attributes: Vec<String>,
-    pub bg: String,
-    pub fg: String,
-    pub underline: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Atom {
-    pub contents: String,
-    pub face: Face,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Coord {
-    pub column: u64,
-    pub line: u64,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct InfoShow {
-    pub title: Line,
-    pub content: Vec<Line>,
-    pub anchor: Coord,
-    pub face: Face,
-    pub style: String,
-}
-
-impl InfoShow {
-    pub fn title_content(&self) -> String {
-        let mut cont = String::new();
-        for atom in self.title.iter() {
-            cont.push_str(&atom.contents)
-        }
-
-        cont
+    if fine {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
     }
-
-    pub fn content(&self) -> String {
-        let mut cont = String::new();
-        for atom in self.content.iter().flatten() {
-            cont.push_str(&atom.contents)
-        }
-
-        cont
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct JsonRpc {
-    pub jsonrpc: String,
-    pub method: String,
-    pub params: InfoShow,
-}
-
-pub fn read_response(stream: &mut BufReader<ChildStdout>, output_buffer: &mut Vec<u8>) -> Result<JsonRpc, serde_json::Error> {
-    let _ = stream.read_until(b'\n', output_buffer);
-    let response = serde_json::from_slice::<JsonRpc>(&output_buffer)?;
-    output_buffer.clear();
-
-	Ok(response)
 }
 
 pub fn send_to_kak_socket(session: &str, msg: &str) -> Result<(), io::Error> {

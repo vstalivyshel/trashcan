@@ -1,28 +1,10 @@
-pub const SELF: &str = "GLUA";
+use crate::SELF;
+use std::ffi::OsStr;
+use std::path::Path;
+
 pub const MAIN_COMMAND: &str = "glua-eval";
-pub const CLIENT_HANDLER: &str = "glua_current_client";
-pub const VAL_HANDLER: &str = "glua_val_handler";
 pub const VAL_SEP: &str = "§";
-pub const CMD_DEL: &str = "; ";
-
-pub const SET: &str = "set-option";
-pub const SET_ADD: &str = "set-option -add";
-pub const SET_REG: &str = "set-register";
-pub const DEF: &str = "define-command";
-pub const EVAL: &str = "evaluate-commands";
 pub const EVACL: &str = "evaluate-commands -client";
-pub const DECL: &str = "declare-option";
-pub const INFO: &str = "info";
-pub const EXEC: &str = "execute-keys";
-pub const TRY_CATCH: [&str; 2] = ["try", "catch"];
-pub const ECHO: &str = "echo";
-pub const ECHO_DBG: &str = "echo -debug";
-pub const FAIL: &str = "fail";
-
-pub const GLOB: &str = "global";
-
-pub const NOP: &str = "''";
-pub const NIL: &str = "nil";
 
 pub enum Prefix {
     Opt,
@@ -43,57 +25,16 @@ macro_rules! f {
     }}
 }
 
-pub fn session_prelude() -> String {
-    let decl = "declare-option -hidden str";
-    [
-        f!(decl VAL_HANDLER),
-        f!(decl CLIENT_HANDLER),
-        f!(DEF MAIN_COMMAND "-override -params 1..").block([
-            f!(SET GLOB CLIENT_HANDLER "client".as_val()),
-            f!(EVACL SELF).and_kakqt(f!(INFO "-title" CLIENT_HANDLER.as_opt() "@".as_arg().dqt())),
-        ]),
-        f!("alias" GLOB "lua" MAIN_COMMAND),
-    ]
-    .as_cmd()
-}
-
-pub fn request_value<A: Cmd , B: IntoIterator<Item=A>>(pref: Prefix, vars: B) -> String {
-    use Prefix::*;
-    let vars = vars.into_iter().map(|v| {
-        match pref {
-            Val => v.as_val().and(VAL_SEP),
-            Arg => v.as_arg().and(VAL_SEP),
-            Opt => v.as_opt().and(VAL_SEP),
-            Reg => v.as_reg().and(VAL_SEP),
-        }
-    }).collect::<String>();
-
-    [
-        f!(SET GLOB VAL_HANDLER NOP),
-        f!(SET_ADD GLOB VAL_HANDLER vars.dqt()),
-        f!(EVACL SELF).and_kakqt(f!(INFO VAL_HANDLER.as_opt().dqt())),
-    ].as_cmd()
-}
-
 pub fn throw_error<B: Cmd, C: Cmd>(fail_msg: B, error: C) -> String {
     [
-        f!(ECHO "-markup" "{Error}".and(fail_msg).kakqt()),
-        f!(ECHO_DBG SELF.and("::ERR ").and(error.dqt()).kakqt()),
-    ].as_cmd()
-}
-
-pub fn writeln_kakbuf<S: Cmd>(buffer: S, msg: S) -> String {
-    let buffer = buffer.qt();
-    [
-        f!("edit -existing" buffer).catch_err(f!("edit -scratch" buffer)),
-        f!(SET_REG "g".qt() msg.dqt()),
-        f!(EXEC "gegh\"gP<a-o>".qt()),
+        "echo -markup {Error}".and_kakqt(fail_msg),
+        "echo -debug".and_kakqt(SELF.and("::ERR\n").and(error.dqt())),
     ]
     .as_cmd()
 }
 
 pub fn try_catch<S: Cmd>(try_cmd: S, catch_cmd: S) -> String {
-    f!(TRY_CATCH[0] try_cmd.kakqt() TRY_CATCH[1] catch_cmd.kakqt())
+    f!("try".and_kakqt(try_cmd) "catch".and_kakqt(catch_cmd))
 }
 
 pub trait Cmd: AsRef<str> + Sized {
@@ -112,6 +53,10 @@ pub trait Cmd: AsRef<str> + Sized {
         new.push_str(more.as_ref());
 
         new
+    }
+
+    fn for_sh(self) -> String {
+        self.sur_with("kak_", "")
     }
 
     fn as_arg(self) -> String {
@@ -159,7 +104,7 @@ impl Cmd for String {}
 impl Cmd for &String {}
 impl Cmd for &str {}
 
-pub trait CmdChain {
+pub trait CmdChain: IntoIterator {
     fn as_cmd(self) -> String;
     fn as_eval(self) -> String;
     fn kakqt(self) -> String;
@@ -170,7 +115,7 @@ impl<T: Cmd, I: IntoIterator<Item = T>> CmdChain for I {
         let mut cmd = String::new();
         for c in self.into_iter() {
             cmd.push_str(c.as_ref());
-            cmd.push_str(CMD_DEL);
+            cmd.push_str("; ");
         }
 
         cmd

@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-env_logger = "0.10.0"
-log = "0.4.17"
+libc = "0.2.142"
 mlua = { version = "0.8.8", features = ["luajit"] }
-serde = { version = "1.0.160", features = ["derive"] }
-serde_json = "1.0.96"
+regex = "1.8.1"
+tempfile = "3.5.0"

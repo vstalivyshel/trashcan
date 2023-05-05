@@ -1,86 +1,101 @@
 #[macro_use]
-mod lua;
-mod kak_cmd;
 mod utils;
-use crate::kak_cmd::{Cmd, EVACL, EXEC, SELF, VAL_SEP};
-use crate::lua::{lua_prelude, LuaServer};
-use crate::utils::*;
-use log::{debug, error, info};
-use std::io::{BufRead, BufReader};
-use std::process::{self, Stdio, ChildStdout};
+mod kak_cmd;
+mod lua;
+use crate::{
+    kak_cmd::{Cmd, EVACL},
+    lua::{SES, lua_prelude, Lua, LuaServer},
+    utils::*,
+};
+use std::{
+    fs::File,
+    io::{self, BufRead, BufReader, Read},
+    path::{Path, PathBuf},
+    process::{self, Stdio},
+    thread::sleep,
+    time::Duration,
+};
+use tempfile::TempDir;
 
-fn run() -> Result<(), mlua::Error> {
-    let session = std::env::args().skip(1).next();
-    if session.is_none() {
-        eprintln!("No session name supplied");
-        process::exit(69)
-    }
-    let session = session.unwrap();
+// TODO: Test a lua fifo communication
 
-    let mut json_client = std::process::Command::new("kak")
-        .args([
-            "-c",
-            &session,
-            "-ui",
-            "json",
-            "-e",
-            &f!("rename-client" SELF "; e -scratch *scratch*"),
-        ])
-        .stdout(Stdio::piped())
-        .spawn()?;
+pub const SELF: &str = "GLUA";
+pub const VAL_FIFO: &str = "glua_val_fifo_handler";
 
-    let mut stream = BufReader::new(json_client.stdout.take().unwrap());
-    let mut output_buffer = Vec::<u8>::new();
-    let lua = lua_prelude(&session)?;
+struct GluaServer {
+    session: String,
+    root_dir: TempDir,
+    val_fifo: PathBuf,
+    val_fifo_path: String,
+    lua: Lua,
+}
 
-    loop {
-        let received = read_response(&mut stream, &mut output_buffer);
+impl GluaServer {
+    pub fn setup(session: String) -> Result<Self, mlua::Error> {
+        let root_dir = tempfile::Builder::new().prefix(SELF).tempdir()?;
+        let mode = 0o777;
+        let root_path = root_dir.path();
+        let val_fifo = root_path.join("glua_pipe_A");
+        create_fifo(&val_fifo, mode)?;
+        let val_fifo_path = val_fifo.to_str().unwrap().to_string();
+        let lua = lua_prelude()?;
+        lua.set_data::<String>(SES, session.clone())?;
 
-        if let Err(parse_err) =  received {
-    		if parse_err.is_eof() {
-        		break;
-    		}
-    		continue;
-        }
-
-        let info = received.unwrap().params;
-        lua.kak_eval_client(SELF, "execute-keys '<esc>'")?;
-
-        let chunck = info.content();
-        if chunck.is_empty() {
-            continue;
-        } 
-
-        let client = info.title_content();
-
-        if client.starts_with("VALS") {
-            for val in chunck.split_terminator(VAL_SEP) {
-                lua.received_values()?.push(val.to_string())?;
-            }
-        } else if !client.is_empty() {
-            lua.set_client(&client)?;
-        }
-
-        info!("InfoShow.title.content: \"{client}\"");
-        info!("InfoShow.content.content: \"{chunck}\"");
-        debug!("InfoShow: \n{info:?}");
-
-        if let Err(lua_err) = lua.chunck_eval(&chunck) {
-            error!("Lua::Error: \n{lua_err}");
-            lua.kak_eval_current_client(&kak_cmd::throw_error(
-                "Error executing lua chunck! See debug",
-                lua_err.to_string(),
-            ))?;
-        }
+        Ok(GluaServer {
+            session,
+            root_dir,
+            val_fifo,
+            val_fifo_path,
+            lua,
+        })
     }
 
-    Ok(())
+    fn run(&self) -> Result<(), mlua::Error> {
+  //       println!("{}", &self.val_fifo_path);
+  //       let mut output_buf = String::new();
+  //       self.ask_for_value("client0", "buffile")?;
+  //       // sleep(Duration::from_secs(1));
+  //       let mut val_fifo_buf = BufReader::new(File::open(&self.val_fifo)?);
+  //       val_fifo_buf.read_to_string(&mut output_buf)?;
+
+		// println!("{output_buf}");
+  //       // if !output_buf.is_empty() {
+  //       //     if output_buf.contains("stop") {
+  //       //         break
+  //       //     }
+  //       // }
+
+  //       output_buf.clear();
+
+        Ok(())
+    }
 }
 
 fn main() {
-    env_logger::init();
-    if let Err(lua_err) = run() {
-        eprintln!("{SELF}::LuaError: {lua_err}");
-        std::process::exit(69);
+    let supplied_session = std::env::args().skip(1).next();
+    let session = if let Some(session) = supplied_session {
+        session
+    } else {
+        eprintln!("{SELF}::Error => No session name supplied");
+        process::exit(69);
     };
+
+    let server = match GluaServer::setup(session) {
+        Err(setup_failed) => {
+            eprintln!("{SELF}::Error => Setup failed: \"{setup_failed}\"");
+            process::exit(69);
+        }
+        Ok(nice) => nice,
+    };
+
+    if let Err(run_err) = server.run() {
+        send_to_kak_socket(
+            &server.session,
+            &kak_cmd::throw_error(
+                SELF.and("::Error => Something failed while running server! See debug!"),
+                run_err.to_string(),
+            ),
+        )
+        .expect("send 'run_err' to kakoune session");
+    }
 }

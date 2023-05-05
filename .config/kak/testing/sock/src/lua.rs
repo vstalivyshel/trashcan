@@ -1,25 +1,23 @@
 use crate::f;
+use crate::kak_cmd::{Cmd, EVACL};
 use crate::utils::send_to_kak_socket;
-use crate::kak_cmd::{self, Cmd, EVACL, Prefix};
 pub use mlua::Lua;
-use mlua::{Result, Table, Variadic};
+use mlua::{Result, Table, ToLua, FromLua};
+use std::io::{Read};
+use std::fs::File;
 
 pub const KAK: &str = "kak";
+pub const SES: &str = "session";
+pub const CLIENT: &str = "client";
 pub const META: &str = "current";
-pub const RECV: &str = "received";
-const SES: &str = "session";
-const CLIENT: &str = "client";
+pub const FIFO: &str = "val_fifo";
 
 pub trait LuaServer {
-    fn current_session(&self) -> Result<String>;
-    fn current_client(&self) -> Result<String>;
-    fn received_values(&self) -> Result<Table>;
-    fn set_client(&self, client: &str) -> Result<()>;
     fn session_data(&self) -> Result<Table>;
-    fn chunck_eval(&self, chunck: &str) -> Result<()>;
-    fn kak_eval_current_session(&self, cmd: &str) -> Result<()>;
-    fn kak_eval_client(&self, client: &str, cmd: &str) -> Result<()>;
-    fn kak_eval_current_client(&self, cmd: &str) -> Result<()>;
+    fn set_data<A: for<'a> ToLua<'a>>(&self, field: &str, value: A) -> Result<()>;
+    fn get_data<A: for<'a> FromLua<'a>>(&self, field: &str) -> Result<A>;
+    fn exec(&self, chunck: &str, args: Table) -> Result<()>;
+    fn kak_eval(&self, cmd: &str) -> Result<()>;
 }
 
 impl LuaServer for Lua {
@@ -27,71 +25,46 @@ impl LuaServer for Lua {
         self.globals().get::<_, Table>(KAK)?.get::<_, Table>(META)
     }
 
-    fn current_session(&self) -> Result<String> {
-        self.session_data()?.get::<_, String>(SES)
+    fn set_data<A: for<'a> ToLua<'a>>(&self, field: &str, value: A) -> Result<()> {
+        self.session_data()?.set(field, value)
     }
 
-    fn current_client(&self) -> Result<String> {
-        self.session_data()?.get::<_, String>(CLIENT)
+    fn get_data<A: for<'a> FromLua<'a>>(&self, field: &str) -> Result<A> {
+        self.session_data()?.get::<_, A>(field)
     }
 
-    fn received_values(&self) -> Result<Table> {
-        self.session_data()?.get::<_, Table>(RECV)
+    fn exec(&self, chunck: &str, args: Table) -> Result<()> {
+        self.load(&chunck.to_string()).exec()
     }
 
-    fn set_client(&self, client: &str) -> Result<()> {
-        self.session_data()?.set(CLIENT, client.to_string())
-    }
-
-    fn chunck_eval(&self, chunck: &str) -> Result<()> {
-        self.load(&chunck.to_string()).eval()?;
-        let empty = self.create_table()?;
-        self.session_data()?.set(RECV, empty)
-    }
-
-    fn kak_eval_current_session(&self, msg: &str) -> Result<()> {
-        send_to_kak_socket(&self.current_session()?, msg)?;
+    fn kak_eval(&self, cmd: &str) -> Result<()> {
+        let cur_ses = self.get_data::<String>(SES)?;
+        send_to_kak_socket(&cur_ses, cmd)?;
         Ok(())
-    }
-
-    fn kak_eval_client(&self, client: &str, cmd: &str) -> Result<()> {
-        self.kak_eval_current_session(&f!(EVACL client cmd.kakqt()))
-    }
-
-    fn kak_eval_current_client(&self, cmd: &str) -> Result<()> {
-        self.kak_eval_client(&self.current_client()?, &cmd.kakqt())
     }
 }
 
-pub fn lua_prelude(session: &str) -> Result<Lua> {
+pub fn lua_prelude() -> Result<Lua> {
     let lua = Lua::new();
     {
         let globals = lua.globals();
         let kak = lua.create_table()?;
         let meta = lua.create_table()?;
-        let received_values = lua.create_table()?;
-        meta.set(RECV, received_values)?;
-        meta.set(SES, session.to_string())?;
-
         kak.set(META, meta)?;
 
-        kak.set(
-            "val",
-            lua.create_function(|lua, vars: Variadic<String>| {
-                lua.kak_eval_current_client(&kak_cmd::request_value(Prefix::Val, vars.as_slice()))?;
-                Ok(lua.received_values()?)
-            })?,
-        )?;
+		kak.set(
+    		"val",
+    		lua.create_function(|lua, var: String|{
+        		let fifo_path = &lua.get_data::<String>(FIFO)?;
+        		let cur_client = lua.get_data::<String>(CLIENT)?;
+        		lua.kak_eval(&f!(EVACL cur_client f!("echo -to-file" fifo_path.qt() var.as_val()).kakqt()))?;
+        		let mut fifo = File::open(fifo_path)?;
+        		let mut value = String::new();
+        		fifo.read_to_string(&mut value)?;
 
-        kak.set(
-            "eval",
-            lua.create_function(|lua, cmd: String| lua.kak_eval_current_client(&cmd))?,
-        )?;
-
-        kak.set(
-            "send",
-            lua.create_function(|lua, msg: String| lua.kak_eval_current_session(&msg))?,
-        )?;
+        		Ok(value)
+    		})?
+		)?;
 
         kak.set(
             "send_to",
