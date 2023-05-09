@@ -1,13 +1,12 @@
-use crate::f;
 use crate::utils::*;
+use crate::{f, SELF, MAIN_CMD};
 use std::{
     fs::File,
     io::{self, Read, Write},
     os::unix::net::UnixStream,
 };
 
-pub const SELF: &str = "GLUA";
-pub const VAL_SEP: &str = "§";
+const VAL_SEP: &str = "§";
 
 pub enum KakVal {
     Val(String),
@@ -26,6 +25,30 @@ impl ToString for KakVal {
             File(v) => v.as_file(),
         }
     }
+}
+
+pub fn kak_init_cmd(self_cmd: &str, socket_path: &str) -> String {
+    let socket_handler = &SELF.and("_socket_handler");
+    [
+        f!("declare-option -hidden str" socket_handler),
+        f!("set-option global" socket_handler socket_path.qt()),
+        f!("define-command" MAIN_CMD "-override -params 1..").and_kakqt(
+            "evaluate-commands".and_sh([
+                self_cmd.to_string(),
+                "$kak_opt_".and(socket_handler).dqt(),
+                "$kak_session".dqt(),
+                "$kak_client".dqt(),
+                "$@".dqt(),
+            ]),
+        ),
+        f!("alias global lua" MAIN_CMD),
+        f!("hook -group" SELF.and("kill_yourself").qt() "global KakEnd '*'").and_sh([
+            self_cmd,
+            "kill",
+            &"$kak_opt_".and(socket_handler).dqt(),
+        ]),
+    ]
+    .as_cmd()
 }
 
 pub fn kak_send_msg(session: &str, msg: &str) -> Result<(), io::Error> {

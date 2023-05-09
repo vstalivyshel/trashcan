@@ -1,117 +1,129 @@
 mod kakoune;
 mod utils;
-use utils::*;
 use kakoune::*;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::process;
 use std::io::{self, Read, Write};
-use std::path::PathBuf;
-use std::os::unix::net::{UnixStream, UnixListener};
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::{Path, PathBuf};
+use std::process;
 use tempfile::TempDir;
+use utils::*;
 
-const MAIN_CMD: &str = "glua-eval-test";
+pub const SELF: &str = "GLUA";
+pub const MAIN_CMD: &str = "glua-eval-test";
 
-struct Server {
-    pid_file: PathBuf,
+#[derive(Serialize, Deserialize)]
+enum Request {
+    ExecLua(ClientData),
+    Stop,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ClientData {
+    session: String,
+    client: String,
+    chunck: String,
+    chunck_args: Vec<String>,
+}
+
+struct GluaServer {
     root: TempDir,
+    pid_file: PathBuf,
+    socket_path: PathBuf,
     socket: UnixListener,
 }
 
-impl Server {
-    fn setup(session: &str) -> Result<Self, io::Error>{
-        let root = tempfile::Builder::new().prefix(&format!("{SELF}_{session}")).tempdir()?;
+impl GluaServer {
+    fn setup(root_path: Option<&String>) -> Result<Self, io::Error> {
+        let root_name = &SELF.and(".root");
+
+        let root = if let Some(specified_root) = root_path {
+            tempfile::Builder::new()
+                .prefix(root_name)
+                .rand_bytes(0)
+                .tempdir_in(Path::new(specified_root))
+        } else {
+            tempfile::Builder::new().prefix(root_name).tempdir()
+        }?;
+
         let root_path = root.path();
-        let pid_file = root_path.join(&format!("{SELF}_{session}.pid"));
-        let socket_path = root_path.join(&format!("{SELF}_{session}.socket"));
+        let pid_file = root_path.join(&SELF.and(".pid"));
+        let socket_path = root_path.join(&SELF.and(".socket"));
         let socket = UnixListener::bind(&root_path.join(&socket_path))?;
 
-        Ok(Server {
-            pid_file,
+        Ok(GluaServer {
             root,
+            pid_file,
+            socket_path,
             socket,
         })
     }
 
     fn run(self) -> Result<(), io::Error> {
-        let mut buffer = String::new();
-        let mut socket = self.socket.incoming();
-        for stream in socket {
+        let mut incoming = self.socket.incoming();
+        for stream in incoming {
             let mut stream = stream.unwrap();
-            stream.read_to_string(&mut buffer)?;
-            kak_send_msg()
-            if buffer.contains("stop") {
-                break;
+            let request: Request = bincode::deserialize_from(stream).unwrap();
+            use Request::*;
+            match request {
+                ExecLua(ses_data) => {
+                    todo!("exec lua")
+                }
+                Stop => {
+                    break;
+                }
             }
-            buffer.clear();
         }
 
         Ok(())
     }
 }
 
-#[derive(Debug)]
-struct Request {
-    session: String,
-    client: String,
-    chunck: Vec<u8>,
-    chunck_args: Vec<String>,
-}
-
 fn main() {
-    let mut args = std::env::args().skip(1).collect::<VecDeque<String>>();
     let self_cmd = std::env::current_exe().unwrap();
     let self_cmd = self_cmd.to_str().unwrap();
-
-    if args.len() < 4 {
-        let sub_cmd = args.get(0);
-        if sub_cmd.is_none() || !sub_cmd.unwrap().starts_with("init") {
-            println!("fail {SELF}::Error: Your {SELF} command have wrong argument count!");
-            process::exit(69);
-        }
-
-        let socket_handler = SELF.and("_socket_handler");
-        let init_cmd = [
-            f!("declare-option -hidden str" socket_handler),
-            f!("set-option global" socket_handler "ready".qt()),
-            f!("define-command" MAIN_CMD "-override -params 1..").and_kakqt(
-                "evaluate-commands".and_sh([
-                    self_cmd.to_string(),
-                    "$kak_opt_".and(socket_handler).dqt(),
-                    "$kak_session".dqt(),
-                    "$kak_client".dqt(),
-                    "$@".dqt(),
-                ]),
-            ),
-            f!("alias global lua" MAIN_CMD),
-        ].as_cmd();
-
-        println!("{init_cmd}");
-        process::exit(0);
+    let mut args = std::env::args().skip(1).collect::<VecDeque<String>>();
+    if args.len() < 1 {
+        println!("fail {SELF}::Error: Wrong argument count");
+        process::exit(69);
     }
+    let sub = args.get(0).unwrap();
 
-    let socket = args.pop_front().unwrap();
-    let session = args.pop_front().unwrap();
-    let client = args.pop_front().unwrap();
-    let chunck = args.pop_back().unwrap().into_bytes();
-    let chunck_args = args.into_iter().collect::<Vec<String>>();
+    match args.len() {
+        1 | 2 if sub.starts_with("init") => {
+            let root = args.get(1);
+            let server = GluaServer::setup(root).unwrap();
+            println!(
+                "{init_cmd}",
+                init_cmd = kak_init_cmd(&self_cmd, &server.socket_path.to_str().unwrap())
+            );
+            server.run().unwrap();
+            // let cwd = std::env::current_dir().unwrap();
+            // let daemon = daemonize::Daemonize::new()
+            //     .pid_file(&server.pid_file)
+            //     .working_directory(&cwd)
+            //     .start()
+            //     .unwrap();
+        }
+        2 if sub.starts_with("kill") => {
+            let server = args.get(1).unwrap();
+            let stream = UnixStream::connect(&server).unwrap();
+            bincode::serialize_into(stream, &Request::Stop).unwrap();
+        }
+        4 => {
+            let socket = args.pop_front().unwrap();
 
-    // let data = Request {
-    //     session,
-    //     client,
-    //     chunck,
-    //     chunck_args,
-    // };
+            let data = ClientData {
+                session: args.pop_front().unwrap(),
+                client: args.pop_front().unwrap(),
+                chunck: args.pop_back().unwrap().into(),
+                chunck_args: args.into_iter().collect::<Vec<String>>(),
+            };
 
-    if socket.starts_with("ready") {
-        let server = Server::setup(&session).unwrap();
-        let cwd = std::env::current_dir().unwrap();
-        let daemon = daemonize::Daemonize::new()
-            .pid_file(&server.pid_file)
-            .working_directory(&cwd)
-            .start()
-            .unwrap();
-    } else {
-        let mut stream = UnixStream::connect(&socket).unwrap();
-        stream.write_all(b"echo hello").unwrap();
+            let mut stream = UnixStream::connect(&socket).unwrap();
+            bincode::serialize_into(stream, &Request::ExecLua(data)).unwrap();
+        }
+        _ => println!("fail {SELF}::Error: Your {SELF} command have wrong argument count!"),
     }
 }

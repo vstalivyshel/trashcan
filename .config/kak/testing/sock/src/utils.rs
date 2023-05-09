@@ -1,4 +1,10 @@
-use std::{ffi::CString, io, os::unix::ffi::OsStrExt, path::Path};
+use crate::SELF;
+use std::{
+    ffi::CString,
+    io,
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf},
+};
 
 #[macro_export]
 macro_rules! f {
@@ -13,8 +19,13 @@ macro_rules! f {
 }
 
 pub fn temp_fifo() -> Option<tempfile::TempPath> {
+    temp_fifo_in(std::env::temp_dir())
+}
+
+pub fn temp_fifo_in<P: AsRef<Path>>(path: P) -> Option<tempfile::TempPath> {
     let temp_path = tempfile::TempPath::from_path(
-        std::env::temp_dir().join(format!("{:?}", rand::random::<usize>())),
+        path.as_ref()
+            .join(format!("{SELF}_temp_fifo_{:?}", rand::random::<u64>())),
     );
 
     if let Err(_) = create_fifo(&temp_path, 0o777) {
