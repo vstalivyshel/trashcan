@@ -1,10 +1,11 @@
 [package]
 name = "glua"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 
 [dependencies]
+daemonize = "0.5.0"
 libc = "0.2.142"
 mlua = { version = "0.8.8", features = ["luajit"] }
-regex = "1.8.1"
+rand = "0.8.5"
 tempfile = "3.5.0"
