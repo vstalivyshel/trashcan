@@ -23,20 +23,18 @@ enum Request {
 }
 
 impl Request {
-    fn send(&self, root_path: &str) -> Result<(), bincode::Error> {
-        let root_path = Path::new(root_path);
-        let socket = if root_path.ends_with(ROOT) {
-            root_path.join(SOCKET)
+    fn send_to(&self, root_path: &str) -> Result<(), bincode::Error> {
+        let path = Path::new(root_path);
+        let socket = if root_path.contains(ROOT) {
+            path.join(SOCKET)
         } else {
-            root_path.join(ROOT).join(SOCKET)
+            path.with_extension(ROOT).join(SOCKET)
         };
-        let stream = UnixStream::connect(&socket)?;
-        bincode::serialize_into(stream, self)?;
 
-        Ok(())
+        bincode::serialize_into(UnixStream::connect(&socket)?, self)
     }
 
-    fn send_err<E: ToString>(&self, msg: &str, error: &E) -> Result<(), io::Error>{
+    fn try_send_err<E: ToString>(&self, msg: &str, error: &E) -> Result<(), io::Error> {
         if let Request::ExecLua(ref d) = self {
             let session = &d.session;
             let client = &d.session;
@@ -45,7 +43,6 @@ impl Request {
 
         Ok(())
     }
-
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -58,31 +55,42 @@ struct ClientData {
 
 struct GluaServer {
     root: TempDir,
+    root_path: PathBuf,
     pid_file: PathBuf,
     socket: UnixListener,
 }
 
 impl GluaServer {
-    fn setup(root_path: Option<&String>) -> Result<Self, io::Error> {
-        let root = if let Some(specified_root) = root_path {
-            tempfile::Builder::new()
-                .rand_bytes(0)
-                .prefix(ROOT)
-                .tempdir_in(Path::new(specified_root))
+    fn setup(path: Option<&String>) -> Result<Self, io::Error> {
+        let root_suffix = &".".and(ROOT);
+        let root = if let Some(specified_path) = path {
+            let path = Path::new(specified_path);
+            if path.is_dir() {
+                tempfile::Builder::new()
+                    .rand_bytes(0)
+                    .prefix(root_suffix)
+                    .tempdir_in(&path)
+            } else {
+                let dir_name = path.file_name().unwrap();
+                let path = path.parent().unwrap();
+                tempfile::Builder::new()
+                    .rand_bytes(0)
+                    .prefix(dir_name)
+                    .suffix(root_suffix)
+                    .tempdir_in(&path)
+            }
         } else {
-            tempfile::Builder::new()
-                .rand_bytes(0)
-                .prefix(ROOT)
-                .tempdir()
+            tempfile::Builder::new().suffix(root_suffix).tempdir()
         }?;
 
-        let root_path = root.path();
+        let root_path = root.path().canonicalize()?;
         let pid_file = root_path.join(&SELF.and(".pid"));
         let socket_path = root_path.join(SOCKET);
         let socket = UnixListener::bind(&socket_path)?;
 
         Ok(GluaServer {
             root,
+            root_path,
             pid_file,
             socket,
         })
@@ -92,16 +100,18 @@ impl GluaServer {
         let mut last_request = Request::Continue;
         for stream in self.socket.incoming() {
             if let Err(ref stream_err) = stream {
-                let _ = last_request.send_err("Failed to read request from stream", &stream_err);
+                let _ =
+                    last_request.try_send_err("Failed to read request from stream", &stream_err);
             }
 
             let request = match bincode::deserialize_from::<_, Request>(stream.unwrap()) {
                 Ok(r) => {
                     last_request = r.clone();
                     r
-                },
+                }
                 Err(des_err) => {
-                    let _ = last_request.send_err("Failed to deserialize client request", &des_err);
+                    let _ =
+                        last_request.try_send_err("Failed to deserialize client request", &des_err);
                     Request::Continue
                 }
             };
@@ -115,7 +125,7 @@ impl GluaServer {
                     let _ = kak_send_client(session, client, cmd);
                 }
                 Continue => continue,
-                Stop =>  break,
+                Stop => break,
             }
         }
 
@@ -124,46 +134,56 @@ impl GluaServer {
 }
 
 fn main() {
-    let self_cmd = std::env::current_exe().unwrap();
-    let self_cmd = self_cmd.to_str().unwrap().to_owned();
     let mut args = std::env::args().skip(1).collect::<VecDeque<String>>();
     if args.len() < 1 {
         println!("fail {SELF}::Error: Wrong argument count");
         process::exit(69);
     }
+
+    let self_cmd = std::env::current_exe().unwrap();
+    let self_cmd = self_cmd.to_str().unwrap().to_owned();
     let sub = args.get(0).unwrap();
 
     match args.len() {
-        2 if sub.starts_with("kill") => Request::Stop.send(&args.get(1).unwrap()).unwrap(),
-        1 | 2 if sub.starts_with("init") => {
-            let root = args.get(1);
-            match GluaServer::setup(root) {
-                Err(io_err) => println!("fail {SELF}::Error: Failed to spawn server: {io_err}"),
-                Ok(server) => {
-                    let pid_file = server.pid_file.clone();
-                    let root = server.root.path();
-                    let socket_path = root.to_str().unwrap().to_owned();
-
+        1 | 2 if sub.starts_with("kill") => {
+            if let Some(ref specified_server) = args.get(1) {
+                if let Err(io_err) = serch_and_kill(specified_server) {
+                    println!("fail {SELF}:Error: Failed to kill specified server: {io_err}");
+                }
+            } else {
+                let temp = std::env::temp_dir();
+                let temp = temp.to_str().unwrap();
+                if let Err(io_err) = serch_and_kill(temp) {
                     println!(
-                        "{init_cmd}",
-                        init_cmd = kak_init_cmd(&self_cmd, &socket_path)
+                        "fail {SELF}:Error: Failed to kill unnamed server in {temp} : {io_err}"
                     );
-                    println!("echo {socket_path}");
-
-                    use daemonize::Stdio;
-                    if let Err(d_err) = daemonize::Daemonize::new()
-                        .pid_file(pid_file)
-                        .working_directory(&std::env::current_dir().unwrap())
-                        .start()
-                    {
-                         println!("fail {SELF}::Error: Failed to daemonize: {d_err}");
-                        process::exit(69);
-                    }
-
-                    server.run().unwrap();
                 }
             }
         }
+
+        1 | 2 if sub.starts_with("init") => match GluaServer::setup(args.get(1)) {
+            Err(io_err) => println!("fail {SELF}::Error: Failed to spawn server: {io_err}"),
+            Ok(server) => {
+                let socket_root = server.root_path.to_str().unwrap();
+
+                println!(
+                    "{init_cmd}",
+                    init_cmd = kak_init_cmd(&self_cmd, socket_root),
+                );
+                println!("echo {socket_root}");
+
+                if let Err(d_err) = daemonize::Daemonize::new()
+                    .pid_file(&server.pid_file)
+                    .working_directory(&std::env::current_dir().unwrap())
+                    .start()
+                {
+                    println!("fail {SELF}::Error: Failed to daemonize: {d_err}");
+                    process::exit(69);
+                }
+
+                server.run().unwrap();
+            }
+        },
         4 => {
             let server_root = args.pop_front().unwrap();
 
@@ -173,11 +193,29 @@ fn main() {
                 chunck: args.pop_back().unwrap().into(),
                 chunck_args: args.into_iter().collect::<Vec<String>>(),
             })
-            .send(&server_root)
+            .send_to(&server_root)
             {
                 println!("fail {SELF}::Error: Failed to send lua chunck: {io_err}");
             }
         }
         _ => println!("fail {SELF}::Error: Wrong argument count"),
+    }
+}
+
+fn serch_and_kill(root_path: &str) -> Result<(), bincode::Error> {
+    let path = Path::new(root_path);
+    if path.is_dir() {
+        for entry in path.read_dir()? {
+            let entry_path = entry?.path();
+            let path = entry_path.to_str().unwrap();
+            if path.contains(ROOT) {
+                Request::Stop.send_to(&path)?;
+                println!("echo -markup {{Information}}{SELF}::Info: Server root in {path} have been killed");
+                println!("echo -debug -markup {{Information}}{SELF}::Info: Server root in {path} have been killed");
+            }
+        }
+        Ok(())
+    } else {
+        Request::Stop.send_to(root_path)
     }
 }

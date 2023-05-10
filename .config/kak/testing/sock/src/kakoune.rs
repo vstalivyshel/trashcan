@@ -27,31 +27,21 @@ impl ToString for KakVal {
     }
 }
 
-pub fn kak_init_cmd(self_cmd: &str, socket_path: &str) -> String {
-    let socket_handler = &SELF.and("_socket_handler");
-    let sh_socket_handler = &"$kak_opt_".and(socket_handler);
+pub fn kak_init_cmd(self_cmd: &str, server_root: &str) -> String {
+    let socket_handler = &SELF.and("_socket_root");
+    let sh_socket_handler = &"$kak_opt_".and(socket_handler).dqt();
     let glua = "glua-eval";
     [
         f!("declare-option str" socket_handler),
-        f!("set-option global" socket_handler socket_path.qt()),
+        f!("set-option global" socket_handler server_root.qt()),
         f!("define-command" glua "-override -params 1..").and_kakqt("evaluate-commands".and_sh([
-            self_cmd.to_string(),
-            sh_socket_handler.clone(),
-            "$kak_session".dqt(),
-            "$kak_client".dqt(),
-            "$@".dqt(),
-        ])),
-        f!("define-command glua-kill-server -override").and_kakqt("evaluate-commands".and_sh([
             self_cmd,
-            "kill",
             sh_socket_handler,
+            &"$kak_session".dqt(),
+            &"$kak_client".dqt(),
+            &"$@".dqt(),
         ])),
         f!("alias global lua" glua),
-        f!("hook global -group" SELF.and("-kill-yourself").qt() "KakEnd '.*'").and_sh([
-            self_cmd,
-            "kill",
-            sh_socket_handler,
-        ]),
     ]
     .as_cmd()
 }
