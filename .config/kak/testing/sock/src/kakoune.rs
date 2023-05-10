@@ -1,5 +1,5 @@
 use crate::utils::*;
-use crate::{f, SELF, MAIN_CMD};
+use crate::{f, MAIN_CMD, SELF};
 use std::{
     fs::File,
     io::{self, Read, Write},
@@ -29,23 +29,28 @@ impl ToString for KakVal {
 
 pub fn kak_init_cmd(self_cmd: &str, socket_path: &str) -> String {
     let socket_handler = &SELF.and("_socket_handler");
+    let sh_socket_handler = &"$kak_opt_".and(socket_handler);
+    let glua = "glua-eval";
     [
-        f!("declare-option -hidden str" socket_handler),
+        f!("declare-option str" socket_handler),
         f!("set-option global" socket_handler socket_path.qt()),
-        f!("define-command" MAIN_CMD "-override -params 1..").and_kakqt(
-            "evaluate-commands".and_sh([
-                self_cmd.to_string(),
-                "$kak_opt_".and(socket_handler).dqt(),
-                "$kak_session".dqt(),
-                "$kak_client".dqt(),
-                "$@".dqt(),
-            ]),
-        ),
-        f!("alias global lua" MAIN_CMD),
-        f!("hook -group" SELF.and("kill_yourself").qt() "global KakEnd '*'").and_sh([
+        f!("define-command" glua "-override -params 1..").and_kakqt("evaluate-commands".and_sh([
+            self_cmd.to_string(),
+            sh_socket_handler.clone(),
+            "$kak_session".dqt(),
+            "$kak_client".dqt(),
+            "$@".dqt(),
+        ])),
+        f!("define-command glua-kill-server -override").and_kakqt("evaluate-commands".and_sh([
             self_cmd,
             "kill",
-            &"$kak_opt_".and(socket_handler).dqt(),
+            sh_socket_handler,
+        ])),
+        f!("alias global lua" glua),
+        f!("hook global -group" SELF.and("-kill-yourself").qt() "KakEnd '.*'").and_sh([
+            self_cmd,
+            "kill",
+            sh_socket_handler,
         ]),
     ]
     .as_cmd()
@@ -118,7 +123,7 @@ pub fn kak_throw_error<B: StringExt, C: StringExt>(
         session,
         client,
         &[
-            "echo -markup".and_kakqt("{Error}".and(fail_msg)),
+            "echo -markup".and_kakqt("{Error}".and(fail_msg).and(", see debug!")),
             "echo -debug".and_kakqt(SELF.and("::ERR\n").and(error)),
         ]
         .as_cmd(),
