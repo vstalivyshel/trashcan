@@ -4,10 +4,18 @@ colorscheme rose-pine-moon
 
 declare-option -hidden str glua "%val{config}/glua"
 
+def glua-start -override -params ..1 %{
+    eval %sh{ "$kak_config/testing/sock/target/debug/glua" init "$1"}
+}
+
+def glua-kill -override -params ..1 %{
+    eval %sh{ "$kak_config/testing/sock/target/debug/glua" kill "$1"}
+}
+
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
-add-highlighter -override global/ number-lines -relative -hlcursor -separator ' '
+    add-highlighter -override global/ number-lines -relative -hlcursor -separator ' '
 add-highlighter -override global/ show-matching 
 set global ui_options terminal_assistant=none
 set global tabstop 4

@@ -147,13 +147,13 @@ fn main() {
     match args.len() {
         1 | 2 if sub.starts_with("kill") => {
             if let Some(ref specified_server) = args.get(1) {
-                if let Err(io_err) = serch_and_kill(specified_server) {
+                if let Err(io_err) = search_and_kill(specified_server) {
                     println!("fail {SELF}:Error: Failed to kill specified server: {io_err}");
                 }
             } else {
                 let temp = std::env::temp_dir();
                 let temp = temp.to_str().unwrap();
-                if let Err(io_err) = serch_and_kill(temp) {
+                if let Err(io_err) = search_and_kill(temp) {
                     println!(
                         "fail {SELF}:Error: Failed to kill unnamed server in {temp} : {io_err}"
                     );
@@ -170,7 +170,7 @@ fn main() {
                     "{init_cmd}",
                     init_cmd = kak_init_cmd(&self_cmd, socket_root),
                 );
-                println!("echo {socket_root}");
+                print_info(f!("Born in" socket_root));
 
                 if let Err(d_err) = daemonize::Daemonize::new()
                     .pid_file(&server.pid_file)
@@ -202,20 +202,30 @@ fn main() {
     }
 }
 
-fn serch_and_kill(root_path: &str) -> Result<(), bincode::Error> {
-    let path = Path::new(root_path);
+fn search_and_kill(specified_path: &str) -> Result<(), bincode::Error> {
+    let path = Path::new(specified_path);
+    let mut found_any = false;
     if path.is_dir() {
         for entry in path.read_dir()? {
             let entry_path = entry?.path();
             let path = entry_path.to_str().unwrap();
             if path.contains(ROOT) {
                 Request::Stop.send_to(&path)?;
-                println!("echo -markup {{Information}}{SELF}::Info: Server root in {path} have been killed");
-                println!("echo -debug -markup {{Information}}{SELF}::Info: Server root in {path} have been killed");
+                print_info(f!("Server root in" path "has been killed"));
+                found_any = true;
             }
         }
+        if !found_any {
+            print_info(f!("There is nothing to kill in" specified_path ));
+        }
+
         Ok(())
     } else {
-        Request::Stop.send_to(root_path)
+        Request::Stop.send_to(specified_path)
     }
+}
+
+fn print_info<S: std::fmt::Display>(msg: S) {
+    println!("echo -debug {SELF}::Info: {msg}");
+    println!("echo -markup {{Information}}{SELF}::Info: {msg}");
 }
