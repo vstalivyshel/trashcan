@@ -2,6 +2,7 @@ mod kakoune;
 mod lua;
 mod utils;
 use kakoune::*;
+use utils::*;
 use lua::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -11,7 +12,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use tempfile::TempDir;
-use utils::*;
 
 pub const SELF: &str = "GLUA";
 pub const SOCKET: &str = "GLUA.socket";
@@ -19,9 +19,10 @@ pub const ROOT: &str = "GLUA.root";
 pub const SOCK_HANDLER: &str = "GLUA_socket_root";
 pub const LIST_FILE: &str = "GLUA.list";
 
+// TODO: Don't echo path after born
 enum Do {
     Kill(Option<String>),
-    Spawn(bool, Option<String>),
+    Spawn(Option<String>),
     Send(Request, String),
     SendSync(Request, String),
     WrongArgs,
@@ -50,7 +51,6 @@ struct GluaServer {
     socket: UnixListener,
 }
 
-
 impl Do {
     fn this(mut args: VecDeque<String>) -> Self {
         let arg_len = args.len();
@@ -64,7 +64,7 @@ impl Do {
         use Do::*;
         match sub {
             "kill" => Kill(args.pop_front()),
-            "spawn" | "kakspawn" => Spawn(sub.contains("kak"), args.pop_front()),
+            "spawn" => Spawn(args.pop_front()),
             "send" | "sendsync" if arg_len > 4 => {
                 let server_root = args.pop_front().unwrap();
 
@@ -91,7 +91,9 @@ impl Request {
         let root_path = root_path.as_ref();
         let path = Path::new(root_path);
         let root_path = root_path.to_str().unwrap();
-        let socket = if root_path.contains(ROOT) {
+        let socket = if root_path.ends_with(SOCKET) {
+            path.to_path_buf()
+        } else if root_path.ends_with(ROOT) {
             path.join(SOCKET)
         } else {
             path.with_extension(ROOT).join(SOCKET)
@@ -118,9 +120,9 @@ fn find_and_kill(specified_path: Option<&String>) -> Result<Vec<String>, bincode
     };
     let target = path.to_str().unwrap().to_string();
 
-	let mut removed = Vec::new();
-    if path.is_dir() {
-        for found in find_in(path, ROOT)? {
+    let mut removed = Vec::new();
+    if path.is_dir() && !target.ends_with(ROOT) {
+        for found in find_file_in(path, |p| p.to_str().unwrap().contains(ROOT))? {
             Request::Stop.send_to(&found)?;
             removed.push(found.to_str().unwrap().to_string());
         }
@@ -129,7 +131,7 @@ fn find_and_kill(specified_path: Option<&String>) -> Result<Vec<String>, bincode
         removed.push(target);
     }
 
-	Ok(removed)
+    Ok(removed)
 }
 
 impl GluaServer {
@@ -212,19 +214,11 @@ impl GluaServer {
 fn main() {
     use Do::*;
     match Do::this(std::env::args().skip(1).collect::<VecDeque<String>>()) {
-        Spawn(from_kakoune, target) => match GluaServer::setup(target) {
+        Spawn(target) => match GluaServer::setup(target) {
             Err(io_err) => println!("fail {SELF}::Error: Failed to spawn server: {io_err}"),
             Ok(server) => {
                 let socket_root = server.root_path.to_str().unwrap();
-
-                if from_kakoune {
-                    let self_cmd = env::current_exe().unwrap();
-                    let self_cmd = self_cmd.to_str().unwrap();
-                    println!("{init}", init = kak_init_cmd(self_cmd, socket_root));
-                    print_info(f!("Born in" socket_root));
-                } else {
-                    println!("{socket_root}");
-                }
+                println!("{socket_root}");
 
                 if let Err(d_err) = daemonize::Daemonize::new()
                     .pid_file(&server.pid_file)
@@ -234,6 +228,38 @@ fn main() {
                     println!("fail {SELF}::Error: Failed to daemonize: {d_err}");
                 } else {
                     let _ = server.run();
+                }
+            }
+        },
+        Kill(target) => match find_and_kill(target.as_ref()) {
+            Ok(killed_targets) => {
+                let path = if let Some(path) = target {
+                    if let Ok(p) = Path::new(&path).canonicalize() {
+                        p.to_str().unwrap().to_string()
+                    } else {
+                        path
+                    }
+                } else {
+                    "your temp directory".to_string()
+                };
+
+                if killed_targets.is_empty() {
+                    print_info(f!("There is nothing to kill in" path));
+                } else if killed_targets.len() == 1 {
+                    print_info(f!("Server root in" path "has been killed"));
+                } else {
+                    let dead = killed_targets
+                        .into_iter()
+                        .map(|x| x.dqt().and(", "))
+                        .collect::<String>();
+                    print_info(f!("Killed a couple:" dead))
+                }
+            }
+            Err(io_err) => {
+                if let Some(p) = target {
+                    println!("fail {SELF}::Error: Failed to kill {p}: {io_err}");
+                } else {
+                    println!("fail {SELF}::Error: Failed to kill server: {io_err}");
                 }
             }
         },
@@ -247,32 +273,6 @@ fn main() {
                 println!("fail {SELF}::Error: Failed to send lua chunck: {io_err}");
             }
         }
-        Kill(target) => match find_and_kill(target.as_ref()) {
-            Ok(killed_targets) => {
-                let path = if let Some(path) = target {
-                    if let Ok(p) = Path::new(&path).canonicalize() {
-                        p.to_str().unwrap().to_string()
-                    } else {
-                        path
-                    }
-                } else {
-                    "temp_dir".to_string()
-                };
-
-                if killed_targets.is_empty() {
-                    print_info(f!("There is nothing to kill in" path));
-                } else if killed_targets.len() == 1 {
-                    print_info(f!("Server root in" path "has been killed"));
-                } else {
-                    print_info(f!("Killed a couple:" killed_targets.into_iter().collect::<String>()))
-                }
-            }
-            Err(io_err) => if let Some(p) = target {
-                println!("fail {SELF}::Error: Failed to kill {p}: {io_err}");
-            } else {
-                println!("fail {SELF}::Error: Failed to kill server: {io_err}");
-            }
-        },
         WrongArgs => println!("fail {SELF}::Error: Wrong option"),
     }
 }

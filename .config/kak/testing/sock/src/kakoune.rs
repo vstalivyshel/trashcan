@@ -1,4 +1,4 @@
-use crate::{f, utils::*, SELF, SOCK_HANDLER};
+use crate::{f, utils::*, SELF};
 use std::{
     fs::File,
     io::{self, Read, Write},
@@ -6,45 +6,6 @@ use std::{
 };
 
 const VAL_SEP: &str = "§";
-
-pub fn kak_init_cmd(self_cmd: &str, root: &str) -> String {
-    let cmd = "glua-eval";
-    let cmd_sync = "glua-eval-sync";
-    let cmd_kill = "glua-kill";
-    let sock_handl_sh = &"$kak_opt_".and(SOCK_HANDLER).dqt();
-    "provide-module -override glua-server".block(
-    [
-        f!("declare-option str" SOCK_HANDLER root.qt()),
-        f!("define-command" cmd "-override -params 1..").and_kakqt(
-            "evaluate-commands".and_sh([
-                self_cmd,
-                "send",
-                sock_handl_sh,
-                &"$kak_session".dqt(),
-                &"$kak_client".dqt(),
-                &"$@".dqt(),
-            ]),
-        ),
-        f!("define-command" cmd_sync "-override -params 1..").and_kakqt(
-            "evaluate-commands".and_sh([
-                self_cmd,
-                "sendsync",
-                sock_handl_sh,
-                &"$kak_session".dqt(),
-                &"$kak_client".dqt(),
-                &"$@".dqt(),
-            ]),
-        ),
-        f!("define-command" cmd_kill "-override").block([
-            "evaluate-commands".and_sh([
-                self_cmd,
-                "kill",
-                sock_handl_sh,
-            ]),
-            f!("set-option global" SOCK_HANDLER "''"),
-        ]),
-    ])
-}
 
 pub fn kak_send_msg(session: &str, msg: &str) -> Result<(), io::Error> {
     let rntm = std::env::var("XDG_RUNTIME_DIR").expect("runtimedir");

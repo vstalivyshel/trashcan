@@ -19,11 +19,15 @@ pub fn print_info<S: std::fmt::Display>(msg: S) {
     println!("echo -markup {{Information}}{SELF}::Info: {msg}");
 }
 
-pub fn find_in(dir: PathBuf, target: &str) -> Result<Vec<PathBuf>, io::Error> {
+pub fn find_file_in<F>(dir: PathBuf, f: F) -> Result<Vec<PathBuf>, io::Error>
+where
+    F: Fn(&PathBuf) -> bool
+    {
     let mut found: Vec<PathBuf> = Vec::new();
     for entry in dir.read_dir()? {
         let path = entry?.path();
-        if path.to_str().unwrap().contains(target) {
+        if f(&path) {
+            println!("{path:?}");
             found.push(path.to_path_buf());
         }
     }
