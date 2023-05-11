@@ -54,7 +54,7 @@ return {
     MatchingChar           = {text,highlight_med},
     Whitespace             = {text,base},
     WrapMarker             = "Whitespace",
-    BufferPadding          = "LineNumbers",
+    BufferPadding          = base,
 
     --- Code ---
     value                  = {iris, "+b"},

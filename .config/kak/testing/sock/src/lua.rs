@@ -1,34 +1,29 @@
-use crate::{SELF, VAL_SEP};
-use crate::f;
-use crate::kak_cmd::{evacl, try_catch, Cmd, Prefix};
-use crate::utils::{create_fifo, send_to_kak_socket};
+use crate::kakoune::*;
+use crate::ClientData;
 pub use mlua::Lua;
 use mlua::{FromLua, Result, Table, ToLua, Variadic};
-use std::{fs::File, io::Read, path::Path};
 
-pub const KAK: &str = "kak";
-pub const SES: &str = "session";
-pub const CLIENT: &str = "client";
-pub const META: &str = "current";
-pub const ROOT: &str = "root_dir";
-
+const KAK: &str = "kak";
+const SES: &str = "session";
+const CLIENT: &str = "client";
+const ROOT: &str = "root_dir";
 
 pub trait LuaServer {
-    fn server_prelude(&self) -> Result<()>;
+    fn prelude(&self, root: String) -> Result<()>;
     fn session_data(&self) -> Result<Table>;
     fn set_data<A: for<'a> ToLua<'a>>(&self, field: &str, value: A) -> Result<()>;
     fn get_data<A: for<'a> FromLua<'a>>(&self, field: &str) -> Result<A>;
-    fn kak_get(&self, prefix: Prefix, var_name: Variadic<String>) -> Result<Table>;
-    fn kak_eval<A: Cmd>(&self, cmd: A) -> Result<()>;
-    fn exec(&self, chunck: String) -> Result<()>;
+    fn load_data(&self, data: ClientData) -> Result<()>;
+    fn table_from<I: IntoIterator<Item = String>>(&self, items: I) -> Result<Table>;
+    fn kak_eval(&self, cmd: String) -> Result<()>;
+    fn kak_get(&self, vars: Variadic<String>) -> Result<Table>;
 }
 
 impl LuaServer for Lua {
-    fn server_prelude(&self) -> Result<()> {
+    fn prelude(&self, root: String) -> Result<()> {
         let globals = self.globals();
         let kak = self.create_table()?;
-        let meta = self.create_table()?;
-        kak.set(META, meta)?;
+        kak.set(ROOT, root)?;
 
         kak.set(
             "eval",
@@ -37,8 +32,8 @@ impl LuaServer for Lua {
 
         kak.set(
             "send_to",
-            self.create_function(|_, (ses, msg): (String, String)| {
-                send_to_kak_socket(&ses, &msg)?;
+            self.create_function(|_, (ses, cmd): (String, String)| {
+                kak_send_msg(&ses, &cmd)?;
                 Ok(())
             })?,
         )?;
@@ -48,8 +43,25 @@ impl LuaServer for Lua {
         Ok(())
     }
 
+    fn table_from<I: IntoIterator<Item = String>>(&self, items: I) -> Result<Table> {
+        let result = self.create_table()?;
+        for val in items.into_iter() {
+            result.push(if let Ok(f) = val.parse::<f64>() {
+                f.to_lua(&self)?
+            } else if let Ok(i) = val.parse::<i64>() {
+                i.to_lua(&self)?
+            } else if let Ok(b) = val.parse::<bool>() {
+                b.to_lua(&self)?
+            } else {
+                val.to_lua(&self)?
+            })?;
+        }
+
+        Ok(result)
+    }
+
     fn session_data(&self) -> Result<Table> {
-        self.globals().get::<_, Table>(KAK)?.get::<_, Table>(META)
+        self.globals().get::<_, Table>(KAK)
     }
 
     fn set_data<A: for<'a> ToLua<'a>>(&self, field: &str, value: A) -> Result<()> {
@@ -60,16 +72,27 @@ impl LuaServer for Lua {
         self.session_data()?.get::<_, A>(field)
     }
 
+    fn load_data(&self, data: ClientData) -> Result<()> {
+        let args = self.table_from(data.chunck_args)?;
+        self.set_data::<String>(SES, data.session)?;
+        self.set_data::<String>(CLIENT, data.client)?;
+        self.load(&data.chunck).call(args)
+    }
 
-    fn kak_eval<A: Cmd>(&self, cmd: A) -> Result<()> {
+    fn kak_eval(&self, cmd: String) -> Result<()> {
         let cur_client = self.get_data::<String>(CLIENT)?;
         let cur_ses = self.get_data::<String>(SES)?;
-        send_to_kak_socket(&cur_ses, &evacl(cur_client, cmd))?;
+        kak_send_client(&cur_ses, &cur_client, &cmd)?;
 
         Ok(())
     }
 
-    fn exec(&self, chunck: String) -> Result<()> {
-        self.load(&chunck).exec()
+    fn kak_get(&self, vars: Variadic<String>) -> Result<Table> {
+        let root = self.get_data::<String>(ROOT)?;
+        let cur_ses = self.get_data::<String>(SES)?;
+        let cur_client = self.get_data::<String>(CLIENT)?;
+        let vals = kak_get_values(&root, &cur_ses, &cur_client, vars)?;
+
+        self.table_from(vals)
     }
 }

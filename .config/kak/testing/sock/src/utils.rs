@@ -1,10 +1,6 @@
 use crate::SELF;
-use std::{
-    ffi::CString,
-    io,
-    os::unix::ffi::OsStrExt,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
+use std::{ffi::CString, io, os::unix::ffi::OsStrExt, path::Path};
 
 #[macro_export]
 macro_rules! f {
@@ -18,8 +14,21 @@ macro_rules! f {
     }}
 }
 
-pub fn temp_fifo() -> Option<tempfile::TempPath> {
-    temp_fifo_in(std::env::temp_dir())
+pub fn print_info<S: std::fmt::Display>(msg: S) {
+    println!("echo -debug {SELF}::Info: {msg}");
+    println!("echo -markup {{Information}}{SELF}::Info: {msg}");
+}
+
+pub fn find_in(dir: PathBuf, target: &str) -> Result<Vec<PathBuf>, io::Error> {
+    let mut found: Vec<PathBuf> = Vec::new();
+    for entry in dir.read_dir()? {
+        let path = entry?.path();
+        if path.to_str().unwrap().contains(target) {
+            found.push(path.to_path_buf());
+        }
+    }
+
+    Ok(found)
 }
 
 pub fn temp_fifo_in<P: AsRef<Path>>(path: P) -> Option<tempfile::TempPath> {
