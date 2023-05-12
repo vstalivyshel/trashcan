@@ -1,15 +1,37 @@
-colorscheme rose-pine-moon
+colorscheme lotus
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
 declare-option -hidden str glua "%val{config}/glua"
 
-def glua-spawn -override -params ..1 %{
-    eval %sh{ "$kak_config/testing/sock/target/debug/glua" kakspawn "$1"}
-    require-module glua-server
+provide-module -override glua %{
+    decl str glua_exe "%val{config}/testing/sock/target/debug/glua"
+    decl str glua_root "%val{config}/testing/test"
+
+    def glua-eval -override -params 1.. %{
+        eval %sh{ "$kak_opt_glua_exe" eval "$kak_opt_glua_root" "$kak_session" "$kak_client" "$@"}
+    }
+
+    def glua-start -override %{
+        eval %sh{ "$kak_opt_glua_exe" spawn "$kak_opt_glua_root" }
+    }
+
+    def glua-stop -override %{
+        eval %sh{ "$kak_opt_glua_exe" kill "$kak_opt_glua_root" } 
+    }
+
+    # def glua-spawn-it -override -params ..1 %{
+    #     eval %sh{ "$kak_opt_glua_exe" spawn "$1"}
+    # }
+
+    # def glua-kill-it -override -params ..1 %{
+    #     eval %sh{ "$kak_opt_glua_exe" kill "$1"}
+    # }
 }
 
-
+require-module glua
+alias global lua glua-eval
+lua %{ return 1, 2}
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 

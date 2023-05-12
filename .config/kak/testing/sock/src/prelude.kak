@@ -7,13 +7,19 @@ provide-module glua %{
     # 1.socket path , 2.session, 3.client, 4.chunck
     # Order matters, otherwise error will be raised
     def glua-eval -override -params 1.. %{
-        eval %{ "$kak_opt_glua_exe" eval "$kak_opt_glua_root" "$kak_session" "$kak_client" "$@"}
+        eval %sh{ "$kak_opt_glua_exe" eval "$kak_opt_glua_root" "$kak_session" "$kak_client" "$@"}
     }
 
 	# `eval` async by default, so will not block editor while chunck executing.
     # For sync evalutation use `synceval` which will wait for socket to respond after chunck execution.
-    def glua-eval-sync -override -params 1.. %{
-        eval %{ "$kak_opt_glua_exe" synceval "$kak_opt_glua_root" "$kak_session" "$kak_client" "$@"}
+    def glua-eval -override -params 1.. %{
+        eval %sh{ "$kak_opt_glua_exe" eval "$kak_opt_glua_root" "$kak_session" "$kak_client" "$@"}
+    }
+
+	# Spawn and kill commands without provided path will look into /tmp and
+    # will spawn/kill directory with socket there.
+    def glua-eval-async -override -params 1.. %{
+        eval %sh{ "$kak_opt_glua_exe" asynceval "$kak_opt_glua_root" "$kak_session" "$kak_client" "$@"}
     }
 
 	# `Spawn` command creates directory in provided path which will contain
@@ -22,22 +28,19 @@ provide-module glua %{
     # This directory will also be used for storing temporary files created by
     # Glua functions, 'temp_fifo()' for example. 
     def glua-start -override %{
-        eval %{ "$kak_opt_glua_exe" spawn "$kak_opt_glua_root" }
+    eval %sh{ "$kak_opt_glua_exe" spawn "$kak_opt_glua_root" }
     }
-
-	# Spawn and kill commands without provided path will look into /tmp and
-    # will spawn/kill directory with socket there.
 
     # After creating root directory, `Spawn` command will
     # store root path into %opt{GLUA_last_spawned}
     def glua-spawn-it -override -params ..1 %{
-        eval %{ "$kak_opt_glua_exe" spawn "$1"}
+        eval %sh{ "$kak_opt_glua_exe" spawn "$1"}
     }
 
     # If provided path for `kill` command is directory, Glua will try to find and
     # kill EVRY socket in this directory.
     def glua-kill-it -override -params ..1 %{
-        eval %{ "$kak_opt_glua_exe" kill "$1"}
+        eval %sh{ "$kak_opt_glua_exe" kill "$1"}
     }
 
     # Lua State will be updated till socket lives, means

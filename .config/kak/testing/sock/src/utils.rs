@@ -1,4 +1,6 @@
 use crate::SELF;
+use std::fmt::{self, Formatter, Display};
+use std::error::Error;
 use std::path::PathBuf;
 use std::{ffi::CString, io, os::unix::ffi::OsStrExt, path::Path};
 
@@ -19,20 +21,60 @@ pub fn print_info<S: std::fmt::Display>(msg: S) {
     println!("echo -markup {{Information}}{SELF}::Info: {msg}");
 }
 
-pub fn find_file_in<F>(dir: PathBuf, f: F) -> Result<Vec<PathBuf>, io::Error>
+#[derive(Debug)]
+struct CustomError(String);
+
+impl Display for CustomError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Error for CustomError {}
+
+#[derive(Debug)]
+pub enum Found {
+    Couple(Vec<PathBuf>),
+    One(PathBuf),
+    None,
+}
+
+impl Display for Found {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use Found::*;
+        match self {
+            One(path) => write!(f, "{path:?}"),
+            Couple(paths) => {
+                let res = String::new();
+                for p in paths {
+                    res.push_str(&format!("{p:?}, "));
+                }
+                write!(f, "{res}")
+            }
+            None => write!(f, "\"No path found\""),
+        }
+    }
+}
+
+pub fn find_file_in<F, P: AsRef<Path>>(dir: P, f: F) -> Result<Found, io::Error>
 where
-    F: Fn(&PathBuf) -> bool
-    {
+    F: Fn(&PathBuf) -> bool,
+{
     let mut found: Vec<PathBuf> = Vec::new();
-    for entry in dir.read_dir()? {
+    for entry in dir.as_ref().read_dir()? {
         let path = entry?.path();
         if f(&path) {
-            println!("{path:?}");
             found.push(path.to_path_buf());
         }
     }
 
-    Ok(found)
+    Ok(if found.is_empty() {
+        Found::None
+    } else if found.len() == 1 {
+        Found::One(found.pop().unwrap())
+    } else {
+        Found::Couple(found)
+    })
 }
 
 pub fn temp_fifo_in<P: AsRef<Path>>(path: P) -> Option<tempfile::TempPath> {
