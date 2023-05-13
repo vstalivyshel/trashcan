@@ -6,30 +6,24 @@ use lua::*;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
-    env, io,
-    os::unix::{
-        fs::FileTypeExt,
-        net::{UnixListener, UnixStream},
-    },
+    env, io, fs,
+    os::unix::net::{UnixListener, UnixStream},
     path::{Path, PathBuf},
 };
-use tempfile::TempDir;
 use utils::*;
 
 pub const SELF: &str = "GLUA";
-pub const SOCKET: &str = "GLUA.socket";
-pub const ROOT: &str = "GLUA.root";
 pub const SOCK_HANDLER: &str = "GLUA_socket_root";
-pub const LIST_FILE: &str = "GLUA.list";
 
-/// TODO: How to return a generic error?
-/// TODO: Fix send_to() using CustomError()
+const SOCKET: &str = "GLUA.socket";
+const ROOT: &str = "GLUA.root";
+const PID_FILE: &str = "GLUA.pid";
 
 enum Do {
-    Kill(Option<String>),
-    Spawn(Option<String>),
-    Eval(Request, String),
-    WrongArgs,
+    Kill(PathBuf),
+    Spawn(PathBuf),
+    Eval(Request, PathBuf),
+    WrongArgs(String),
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -50,20 +44,71 @@ pub struct ClientData {
 
 impl Do {
     fn this(mut args: VecDeque<String>) -> Self {
+		let get_root = |path: String| -> Option<PathBuf> {
+    		if path.is_empty() {
+        		return None;
+    		}
+
+            let root = Path::new(&path);
+
+            if root.is_dir() {
+                return if root.to_str().unwrap().contains(ROOT) {
+                    Some(root.canonicalize().unwrap())
+                } else {
+                    Some(root.canonicalize().unwrap().join(ROOT))
+                }
+            }
+
+			let parent = root.parent();
+            if parent.is_some() {
+                let parent = parent.unwrap();
+                let name = root.file_name().unwrap();
+                if parent.to_str().unwrap().is_empty() {
+                    let cwd = env::current_dir().unwrap();
+                    return Some(cwd.join(name).with_extension(ROOT));
+                } else {
+                    let parent = Path::new(parent);
+                    if parent.is_dir() {
+                        return Some(parent.canonicalize().unwrap().join(name).with_extension(ROOT));
+                    } else {
+                        return None
+                    }
+                }
+            }
+
+            None
+		};
+
         let arg_len = args.len();
 
         if arg_len < 1 {
-            return WrongArgs;
+            return WrongArgs("you need to specify a subcommand".into());
         }
 
         let sub = args.pop_front().unwrap();
         let sub = sub.as_str();
+
+		let mut root = env::temp_dir().join(ROOT);
+
+		if let Some(path) = args.pop_front() {
+    		if let Some(p) = get_root(path) {
+        		root = p
+    		}
+		}
+
+
         use Do::*;
         match sub {
-            "kill" => Kill(args.pop_front()),
-            "spawn" => Spawn(args.pop_front()),
+            "spawn" => Spawn(root),
+            "kill" =>  Kill(root),
             "eval" if arg_len > 4 => {
-                let server_root = args.pop_front().unwrap();
+                let socket = root.join(SOCKET);
+                match socket.try_exists() {
+                    Err(e) => return WrongArgs(format!("can't check existence of {root}: {e}", root = root.display())),
+                    Ok(exists) if !exists => return WrongArgs(format!("{socket:?} is invalid socket path")),
+                    Ok(_) => {}
+                }
+
                 let this = ClientData {
                     session: args.pop_front().unwrap(),
                     client: args.pop_front().unwrap(),
@@ -71,23 +116,21 @@ impl Do {
                     chunck_args: args.into_iter().collect::<Vec<String>>(),
                 };
 
-                Eval(Request::LuaExec(this), server_root)
+                Eval(Request::LuaExec(this), socket)
             }
-            _ => WrongArgs,
+            _ => WrongArgs("wrong argument count".into()),
         }
     }
 }
 
+
 impl Request {
-    fn send_to<P: AsRef<Path>>(&self, root_path: &P) -> Result<(), bincode::Error> {
-        let socket = find_socket_in(root_path)?;
-        let stream = UnixStream::connect(&socket)?;
-        bincode::serialize_into(&stream, self)
+    fn send_to<P: AsRef<Path>>(&self, socket: P) -> Result<(), bincode::Error> {
+        bincode::serialize_into(UnixStream::connect(socket)?, self)
     }
 
-    fn send_and_recv<P: AsRef<Path>>(&self, root_path: &P) -> Result<Request, bincode::Error> {
-        let socket = find_socket_in(root_path)?;
-        let stream = UnixStream::connect(&socket)?;
+    fn send_and_recv<P: AsRef<Path>>(&self, socket: P) -> Result<Request, bincode::Error> {
+        let stream = UnixStream::connect(socket)?;
         bincode::serialize_into(&stream, self)?;
         bincode::deserialize_from::<_, Request>(&stream)
     }
@@ -103,86 +146,34 @@ impl Request {
     }
 }
 
-fn find_socket_in<P: AsRef<Path>>(path: &P) -> Result<Found, io::Error> {
-    let root_path = path.as_ref();
-
-    let path = Path::new(root_path);
-    let root_path = root_path.to_str().unwrap();
-    let socket = if root_path.ends_with(SOCKET) {
-        Found::One(path.to_path_buf())
-    } else if root_path.ends_with(ROOT) {
-        Found::One(path.join(SOCKET))
-    } else {
-        find_file_in(path, |f| f.with_extension(ROOT).join(SOCKET).is_socket())?
-    };
-
-    Ok(socket)
-}
-
-fn find_and_kill(specified_path: Option<&String>) -> Result<String, bincode::Error> {
-    let path = match specified_path {
-        Some(p) if !p.is_empty() => Path::new(&p).to_path_buf(),
-        _ => env::temp_dir(),
-    };
-    use Found::*;
-    let found = find_socket_in(&path)?;
-    match &found {
-        One(sock) => {
-            Request::Stop.send_to(sock)?;
-        }
-        Couple(socks) => {
-            for s in socks {
-                Request::Stop.send_to(s)?;
-            }
-        }
-        None => {}
-    };
-
-    Ok(found)
-}
-
 struct GluaServer {
     lua: Lua,
-    root: TempDir,
     root_path: PathBuf,
     pid_file: PathBuf,
     socket: UnixListener,
 }
 
-impl GluaServer {
-    fn setup(path: Option<String>) -> Result<Self, mlua::Error> {
-        let root_suffix = &format!(".{ROOT}");
-        let root = match path {
-            Some(specified_path) if !specified_path.is_empty() => {
-                let path = Path::new(&specified_path);
-                if path.is_dir() {
-                    tempfile::Builder::new()
-                        .rand_bytes(0)
-                        .prefix(root_suffix)
-                        .tempdir_in(&path)
-                } else {
-                    let dir_name = path.file_name().unwrap();
-                    let path = path.parent().unwrap();
-                    tempfile::Builder::new()
-                        .rand_bytes(0)
-                        .prefix(dir_name)
-                        .suffix(root_suffix)
-                        .tempdir_in(&path)
-                }
-            }
-            _ => tempfile::Builder::new().suffix(root_suffix).tempdir(),
-        }?;
+impl Drop for GluaServer {
+    fn drop(&mut self) {
+        if self.root_path.is_dir() {
+             let _ = fs::remove_file(&self.root_path.join(SOCKET));
+             let _ = fs::remove_file(&self.root_path.join(PID_FILE));
+             let _ = fs::remove_dir(&self.root_path);
+        }
+    }
+}
 
-        let root_path = root.path().canonicalize()?;
-        let pid_file = root_path.join(&SELF.and(".pid"));
-        let socket_path = root_path.join(SOCKET);
-        let socket = UnixListener::bind(&socket_path)?;
+impl GluaServer {
+    fn setup<P: AsRef<Path>>(root: P) -> Result<Self, mlua::Error> {
+        let root_path = Path::new(root.as_ref()).to_path_buf();
+        fs::DirBuilder::new().create(&root_path)?;
+        let pid_file = root_path.join(PID_FILE);
+        let socket = UnixListener::bind(&root_path.join(SOCKET))?;
         let lua = Lua::new();
         lua.prelude(root_path.to_str().unwrap().to_string())?;
 
         Ok(GluaServer {
             lua,
-            root,
             root_path,
             pid_file,
             socket,
@@ -242,8 +233,8 @@ impl GluaServer {
 fn main() {
     use Do::*;
     match Do::this(std::env::args().skip(1).collect::<VecDeque<String>>()) {
-        Spawn(target) => match GluaServer::setup(target) {
-            Err(io_err) => println!("fail {SELF}::Error: Failed to spawn server: {io_err}"),
+        Spawn(ref root) => match GluaServer::setup(root) {
+            Err(io_err) => println!("fail {SELF}::Error: Failed to spawn server in {root}: {io_err}", root = root.display()),
             Ok(server) => {
                 let socket_root = server.root_path.to_str().unwrap();
                 print_info(f!("Born in" socket_root.dqt()));
@@ -259,17 +250,15 @@ fn main() {
                 }
             }
         },
-        Kill(target) => match find_and_kill(target.as_ref()) {
-            Ok(killed) => match killed {
-                None if target.is_some() => println!("There is nothing to kill in {}", target.unwrap()),
-                None => println!("There is nothing to kill in temp directory"),
-                _ => println!("Killed: {}", killed),
-            },
-            Err(io_err) => if target.is_some() {
-                println!("fail {SELF}::Error: Failed to kill {p}: {io_err}", p = target.unwrap());
-            } else {
-                println!("fail {SELF}::Error: Failed to kill tmp server: {io_err}");
-            }
+        Kill(root) => match Request::Stop.send_to(root.join(SOCKET)) {
+            Ok(()) => print_info(format!(
+                "Killed: {sock}",
+                 sock = root.display()
+            )),
+            Err(io_err) => println!(
+                "fail {SELF}::Error: Failed to kill {sock}: {io_err}",
+                sock = root.display(),
+            ),
         },
         Eval(ref req, ref target) => match req.send_and_recv(target) {
             Err(io_err) => println!("fail {SELF}::Error: Failed to send lua chunck: {io_err}"),
@@ -281,6 +270,6 @@ fn main() {
                 }
             }
         },
-        WrongArgs => println!("fail {SELF}::Error: Wrong option"),
+        WrongArgs(msg) => println!("fail {SELF}::Error: {msg}"),
     }
 }
