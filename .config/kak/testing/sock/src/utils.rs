@@ -1,6 +1,9 @@
-use crate::{SELF, TEMP_FIFO};
-use std::path::PathBuf;
-use std::{ffi::CString, io, os::unix::ffi::OsStrExt, path::Path};
+use crate::{f, SELF};
+use std::{
+    path::{PathBuf,Path},
+    io::{self, Write},
+    os::unix::net::UnixStream,
+};
 
 #[macro_export]
 macro_rules! f {
@@ -14,40 +17,58 @@ macro_rules! f {
     }}
 }
 
+
+pub fn kak_send_msg(session: &str, msg: &str) -> Result<(), io::Error> {
+    let rntm = std::env::var("XDG_RUNTIME_DIR").expect("runtimedir");
+    let socket = std::path::PathBuf::from(rntm).join("kakoune").join(session);
+    let mut stream = UnixStream::connect(socket)?;
+    let _  = stream.write(&encode(msg))?;
+    stream.flush()?;
+
+    Ok(())
+}
+
+pub fn kak_send_client(session: &str, client: &str, msg: &str) -> Result<(), io::Error> {
+    kak_send_msg(session, &f!("evaluate-commands -client" client msg.kakqt()))
+}
+
+pub fn kak_throw_error<A: StringExt, B: StringExt>(
+    session: &str,
+    client: &str,
+    fail_msg: A,
+    error: B,
+) -> Result<(), io::Error> {
+    kak_send_client(
+        session,
+        client,
+        &[
+            "echo -markup".and_kakqt("{Error}".and(fail_msg).and(", see debug!")),
+            "echo -debug".and_kakqt(SELF.and("::Error: ").and(error)),
+        ]
+        .kakcmd(),
+    )
+}
+
 pub fn print_info<S: std::fmt::Display>(msg: S) {
     println!("echo -debug {SELF}::Info: {msg}");
     println!("echo -markup {{Information}}{SELF}::Info: {msg}");
 }
 
-pub struct TempFifo {
+pub struct TempFile {
     pub path: PathBuf,
 }
 
-impl Drop for TempFifo {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+impl TempFile {
+    pub fn from<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            path: path.as_ref().into(),
+        }
     }
 }
 
-pub fn temp_fifo_in<P: AsRef<Path>>(path: P) -> Result<TempFifo, io::Error> {
-    let path = path
-        .as_ref()
-        .join(format!("{:?}", rand::random::<u64>()))
-        .with_extension(TEMP_FIFO);
-
-	create_fifo(&path, 0o777)?;
-
-	Ok(TempFifo {path})
-}
-
-pub fn create_fifo<P: AsRef<Path>>(path: &P, mode: libc::mode_t) -> Result<(), io::Error> {
-    let path = CString::new(path.as_ref().as_os_str().as_bytes())?;
-    let fine = unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr() as *const _, mode) == 0 };
-
-    if fine {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
     }
 }
 
@@ -83,23 +104,23 @@ pub trait StringExt: AsRef<str> + Sized {
         self.sur_with("kak_", "")
     }
 
-    fn as_arg(self) -> String {
+    fn kakarg(self) -> String {
         self.sur_with("%arg¿", "¿")
     }
 
-    fn as_reg(self) -> String {
+    fn kakreg(self) -> String {
         self.sur_with("%reg£", "£")
     }
 
-    fn as_val(self) -> String {
+    fn kakval(self) -> String {
         self.sur_with("%val®", "®")
     }
 
-    fn as_opt(self) -> String {
+    fn kakopt(self) -> String {
         self.sur_with("%opt¶", "¶")
     }
 
-    fn as_file(self) -> String {
+    fn kakfile(self) -> String {
         self.sur_with("%file{", "}")
     }
 
@@ -119,16 +140,16 @@ pub trait StringExt: AsRef<str> + Sized {
         self.sur_with("%[", "]")
     }
 
-    fn catch_err<S: StringExt>(self, err_cmd: S) -> String {
-        try_catch(self.as_ref(), err_cmd.as_ref())
+    fn and_sh_cmd<S: StringExt>(self, cmd: S) -> String {
+        self.and(" ").and(cmd.sh())
     }
 
     fn and_kakqt<S: StringExt>(self, cmd: S) -> String {
         self.and(" ").and(cmd.kakqt())
     }
 
-    fn and_sh<S: StringExtChain>(self, args: S) -> String {
-        self.and(" ").and(args.as_sh())
+    fn and_sh_args<S: StringExtChain>(self, args: S) -> String {
+        self.and(" ").and(args.kaksh_cmd())
     }
 
     fn block<S: StringExtChain>(self, block: S) -> String {
@@ -141,14 +162,14 @@ impl StringExt for &String {}
 impl StringExt for &str {}
 
 pub trait StringExtChain: IntoIterator {
-    fn as_cmd(self) -> String;
-    fn as_eval(self) -> String;
-    fn as_sh(self) -> String;
+    fn kakcmd(self) -> String;
+    fn kakeval(self) -> String;
+    fn kaksh_cmd(self) -> String;
     fn kakqt(self) -> String;
 }
 
 impl<T: StringExt, I: IntoIterator<Item = T>> StringExtChain for I {
-    fn as_cmd(self) -> String {
+    fn kakcmd(self) -> String {
         let mut cmd = String::new();
         for c in self.into_iter() {
             cmd.push_str(c.as_ref());
@@ -158,7 +179,7 @@ impl<T: StringExt, I: IntoIterator<Item = T>> StringExtChain for I {
         cmd
     }
 
-    fn as_sh(self) -> String {
+    fn kaksh_cmd(self) -> String {
         let mut sh_cmd = String::new();
         for c in self.into_iter() {
             sh_cmd.push_str(c.as_ref());
@@ -169,15 +190,10 @@ impl<T: StringExt, I: IntoIterator<Item = T>> StringExtChain for I {
     }
 
     fn kakqt(self) -> String {
-        self.as_cmd().kakqt()
+        self.kakcmd().kakqt()
     }
 
-    fn as_eval(self) -> String {
-        self.as_cmd().kakqt().sur_with("eval ", "")
+    fn kakeval(self) -> String {
+        self.kakcmd().kakqt().sur_with("eval ", "")
     }
 }
-
-pub fn try_catch<S: StringExt>(try_cmd: S, catch_cmd: S) -> String {
-    f!("try".and_kakqt(try_cmd) "catch".and_kakqt(catch_cmd))
-}
-

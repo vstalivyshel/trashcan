@@ -7,6 +7,7 @@ declare-option -hidden str glua "%val{config}/glua"
 provide-module -override glua %{
     decl str glua_exe "%val{config}/testing/sock/target/debug/glua"
     decl str glua_root "%val{config}/testing/test"
+    decl str-list glua_pop 
 
     def glua-eval -override -params 1.. %{
         eval %sh{ "$kak_opt_glua_exe" eval "$kak_opt_glua_root" "$kak_session" "$kak_client" "$@"}
@@ -20,13 +21,13 @@ provide-module -override glua %{
         eval %sh{ "$kak_opt_glua_exe" kill "$kak_opt_glua_root" } 
     }
 
-    # def glua-spawn-it -override -params ..1 %{
-    #     eval %sh{ "$kak_opt_glua_exe" spawn "$1"}
-    # }
+    def glua-stg-push -override -params 1.. %{
+        eval %sh{ "$kak_opt_glua_exe" push "$kak_opt_glua_root" $@}
+    }
 
-    # def glua-kill-it -override -params ..1 %{
-    #     eval %sh{ "$kak_opt_glua_exe" kill "$1"}
-    # }
+    def glua-stg-pop -override %{
+        set global glua_pop %sh{ "$kak_opt_glua_exe" pop "$kak_opt_glua_root" }
+    }
 }
 
 require-module glua

@@ -1,8 +1,5 @@
-mod kakoune;
 mod lua;
 mod utils;
-mod test;
-use kakoune::*;
 use lua::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,13 +11,7 @@ use std::{
 use utils::*;
 
 pub const SELF: &str = "GLUA";
-pub const SOCK_HANDLER: &str = "GLUA_socket_root";
-pub const VAL_HANLDR: &str = "GLUA_val_handler";
-pub const TEMP_FIFO: &str = "gl";
-
-const SOCKET: &str = "glua.socket";
-const ROOT: &str = "glua.root";
-const PID_FILE: &str = "glua.pid";
+const SOCK_EXT: &str = "glua_socket";
 
 enum CliOpt {
     StgPush(Vec<String>, PathBuf),
@@ -50,7 +41,6 @@ pub struct ClientData {
 }
 
 impl CliOpt {
-    // TODO: CliOpt not use vecdeque, just use iterator
     fn from_args() -> Self {
         let get_root = |path: &String| -> Option<PathBuf> {
             if path.is_empty() {
@@ -59,21 +49,15 @@ impl CliOpt {
 
             let root = Path::new(&path);
 
-            if root.is_dir() {
-                return if root.to_str().unwrap().contains(ROOT) {
-                    Some(root.canonicalize().unwrap())
-                } else {
-                    Some(root.canonicalize().unwrap().join(ROOT))
-                };
+            if root.exists() {
+                return Some(root.canonicalize().unwrap());
             }
 
-            let parent = root.parent();
-            if parent.is_some() {
-                let parent = parent.unwrap();
+            if let Some(parent) = root.parent() {
                 let name = root.file_name().unwrap();
                 if parent.to_str().unwrap().is_empty() {
                     let cwd = env::current_dir().unwrap();
-                    return Some(cwd.join(name).with_extension(ROOT));
+                    return Some(cwd.join(name).with_extension(SOCK_EXT));
                 } else {
                     let parent = Path::new(parent);
                     if parent.is_dir() {
@@ -82,7 +66,7 @@ impl CliOpt {
                                 .canonicalize()
                                 .unwrap()
                                 .join(name)
-                                .with_extension(ROOT),
+                                .with_extension(SOCK_EXT),
                         );
                     } else {
                         return None;
@@ -93,15 +77,15 @@ impl CliOpt {
             None
         };
         let mut args = std::env::args().skip(1);
+        let sub = args.next();
 
-        if let None = args.next() {
+        if sub.is_none() {
             return WrongArgs("you need to specify a subcommand".into());
         }
 
-        let sub = args.next().unwrap().to_owned();
-        let mut args = args.skip(1);
+        let sub = sub.unwrap();
 
-        let mut root = env::temp_dir().join(ROOT);
+        let mut root = env::temp_dir().join(SOCK_EXT);
         if let Some(path) = args.next() {
             if let Some(p) = get_root(&path) {
                 root = p
@@ -110,17 +94,16 @@ impl CliOpt {
 
         use CliOpt::*;
         match sub.as_str() {
-            "push" => StgPush(args.map(|a| a.to_string()).collect::<Vec<String>>(), root),
+            "push" => StgPush(args.collect::<Vec<String>>(), root),
             "pop" => StgPop(root),
             "spawn" => Spawn(root),
             "kill" => Kill(root),
             "eval" => {
-        		let mut args = args.map(|a| a.to_string()).collect::<VecDeque<String>>();
-        		if args.len() < 4 {
+                let mut args = args.collect::<VecDeque<String>>();
+                if args.len() < 3 {
                     return WrongArgs("wrong argument count".into());
-        		}
-                let socket = root.join(SOCKET);
-                match socket.try_exists() {
+                }
+                match root.try_exists() {
                     Err(e) => {
                         return WrongArgs(format!(
                             "can't check existence of {root}: {e}",
@@ -128,7 +111,7 @@ impl CliOpt {
                         ))
                     }
                     Ok(exists) if !exists => {
-                        return WrongArgs(format!("{socket:?} is invalid socket path"))
+                        return WrongArgs(format!("{root:?} is invalid socket path"))
                     }
                     Ok(_) => {}
                 }
@@ -140,7 +123,7 @@ impl CliOpt {
                     chunk_args: args.into_iter().collect::<Vec<String>>(),
                 };
 
-                Eval(Request::LuaExec(this), socket)
+                Eval(Request::LuaExec(this), root)
             }
             _ => WrongArgs("wrong argument count".into()),
         }
@@ -166,7 +149,7 @@ impl Request {
         if let Request::LuaExec(ref d) = self {
             let session = &d.session;
             let client = &d.client;
-            kak_throw_error(session, client, msg, &error.to_string())?;
+            kak_throw_error(session, client, msg, error.to_string())?;
         }
 
         Ok(())
@@ -175,36 +158,23 @@ impl Request {
 
 struct GluaServer {
     lua: Lua,
-    root_path: PathBuf,
-    pid_file: PathBuf,
+    root: TempFile,
     socket: UnixListener,
 }
 
-impl Drop for GluaServer {
-    fn drop(&mut self) {
-        if self.root_path.is_dir() {
-            let _ = fs::remove_file(&self.root_path.join(SOCKET));
-            let _ = fs::remove_file(&self.root_path.join(PID_FILE));
-            let _ = fs::remove_dir(&self.root_path);
-        }
-    }
-}
-
 impl GluaServer {
-    fn setup<P: AsRef<Path>>(root: P) -> Result<Self, mlua::Error> {
-        let root_path = Path::new(root.as_ref()).to_path_buf();
-        fs::DirBuilder::new().create(&root_path)?;
-        let pid_file = root_path.join(PID_FILE);
-        let socket = UnixListener::bind(&root_path.join(SOCKET))?;
+    fn setup<P: AsRef<Path>>(path: P) -> Result<Self, mlua::Error> {
+        let root = TempFile::from(path);
+        let root_path = &root.path;
+        if root_path.exists() {
+            let _ = Request::Stop.send_to(root_path);
+            let _ = fs::remove_file(root_path);
+        }
+        let socket = UnixListener::bind(root_path)?;
         let lua = Lua::new();
-        lua.prelude(root_path.to_str().unwrap().to_string())?;
+        lua.prelude(root_path.to_str().unwrap())?;
 
-        Ok(GluaServer {
-            lua,
-            root_path,
-            pid_file,
-            socket,
-        })
+        Ok(GluaServer { lua, root, socket })
     }
 
     fn run(self) {
@@ -247,23 +217,21 @@ impl GluaServer {
                     }
                     Err(lua_err) => {
                         let _ = last_request.try_send_err("Lua error", &lua_err);
-                        continue;
                     }
                 },
                 StgPop => {
-                    let saved = storage.pop();
-                    let req = if saved.is_none() {
-                        Continue
+                    let req = if let Some(saved) = storage.pop() {
+                        Return(saved)
                     } else {
-                        Return(saved.unwrap())
+                        Continue
                     };
 
                     if let Err(e) = req.send_back(&stream) {
-                        let _ = last_request
-                            .try_send_err("Failed to return values from storage", &e);
+                        let _ =
+                            last_request.try_send_err("Failed to return values from storage", &e);
                     }
                 }
-                StgPush(data) =>  storage.push(data), 
+                StgPush(data) => storage.push(data),
                 Continue => continue,
                 Stop => break,
                 Return(_) => unreachable!("what?"),
@@ -272,7 +240,7 @@ impl GluaServer {
     }
 }
 
-fn main() {
+fn start() {
     use CliOpt::*;
     match CliOpt::from_args() {
         Spawn(ref root) => match GluaServer::setup(root) {
@@ -281,21 +249,20 @@ fn main() {
                 root = root.display()
             ),
             Ok(server) => {
-                let socket_root = server.root_path.to_str().unwrap();
+                let socket_root = server.root.path.to_str().unwrap();
                 print_info(f!("Born in" socket_root.dqt()));
 
                 if let Err(d_err) = daemonize::Daemonize::new()
-                    .pid_file(&server.pid_file)
-                    .working_directory(&std::env::current_dir().unwrap())
+                    .working_directory(env::current_dir().unwrap())
                     .start()
                 {
                     println!("fail {SELF}::Error: Failed to daemonize: {d_err}");
                 } else {
-                    let _ = server.run();
+                    server.run();
                 }
             }
         },
-        Kill(root) => match Request::Stop.send_to(root.join(SOCKET)) {
+        Kill(ref root) => match Request::Stop.send_to(root) {
             Ok(()) => print_info(format!("Killed: {sock}", sock = root.display())),
             Err(io_err) => println!(
                 "fail {SELF}::Error: Failed to kill {sock}: {io_err}",
@@ -306,8 +273,11 @@ fn main() {
             Err(e) => println!("fail {SELF}::Error: Failed to push data into storage: {e}"),
             Ok(_) => print_info("Data saved"),
         },
-        StgPop(socket) => match Request::StgPop.send_and_recv(socket) {
-            Err(e) => println!("fail {SELF}::Error: Failed to get data from storage: {e}"),
+        StgPop(socket) => match Request::StgPop.send_and_recv(&socket) {
+            Err(e) => println!(
+                "fail {SELF}::Error: Failed to get data from {s}: {e}",
+                s = socket.display()
+            ),
             Ok(data) => {
                 if let Request::Return(vals) = data {
                     for val in vals {
@@ -315,7 +285,7 @@ fn main() {
                     }
                 }
             }
-        }
+        },
         Eval(req, socket) => match req.send_and_recv(socket) {
             Err(io_err) => println!("fail {SELF}::Error: Failed to send lua chunck: {io_err}"),
             Ok(ret_vals) => {
@@ -328,4 +298,8 @@ fn main() {
         },
         WrongArgs(msg) => println!("fail {SELF}::Error: {msg}"),
     }
+}
+
+fn main() {
+    start();
 }
