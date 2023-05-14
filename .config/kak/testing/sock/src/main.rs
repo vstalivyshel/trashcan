@@ -1,12 +1,13 @@
 mod kakoune;
 mod lua;
 mod utils;
+mod test;
 use kakoune::*;
 use lua::*;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
-    env, io, fs,
+    env, fs, io,
     os::unix::net::{UnixListener, UnixStream},
     path::{Path, PathBuf},
 };
@@ -14,12 +15,16 @@ use utils::*;
 
 pub const SELF: &str = "GLUA";
 pub const SOCK_HANDLER: &str = "GLUA_socket_root";
+pub const VAL_HANLDR: &str = "GLUA_val_handler";
+pub const TEMP_FIFO: &str = "gl";
 
-const SOCKET: &str = "GLUA.socket";
-const ROOT: &str = "GLUA.root";
-const PID_FILE: &str = "GLUA.pid";
+const SOCKET: &str = "glua.socket";
+const ROOT: &str = "glua.root";
+const PID_FILE: &str = "glua.pid";
 
-enum Do {
+enum CliOpt {
+    StgPush(Vec<String>, PathBuf),
+    StgPop(PathBuf),
     Kill(PathBuf),
     Spawn(PathBuf),
     Eval(Request, PathBuf),
@@ -28,6 +33,8 @@ enum Do {
 
 #[derive(Serialize, Deserialize, Clone)]
 enum Request {
+    StgPop,
+    StgPush(Vec<String>),
     LuaExec(ClientData),
     Return(Vec<String>),
     Continue,
@@ -38,16 +45,17 @@ enum Request {
 pub struct ClientData {
     session: String,
     client: String,
-    chunck: String,
-    chunck_args: Vec<String>,
+    chunk: String,
+    chunk_args: Vec<String>,
 }
 
-impl Do {
-    fn this(mut args: VecDeque<String>) -> Self {
-		let get_root = |path: String| -> Option<PathBuf> {
-    		if path.is_empty() {
-        		return None;
-    		}
+impl CliOpt {
+    // TODO: CliOpt not use vecdeque, just use iterator
+    fn from_args() -> Self {
+        let get_root = |path: &String| -> Option<PathBuf> {
+            if path.is_empty() {
+                return None;
+            }
 
             let root = Path::new(&path);
 
@@ -56,10 +64,10 @@ impl Do {
                     Some(root.canonicalize().unwrap())
                 } else {
                     Some(root.canonicalize().unwrap().join(ROOT))
-                }
+                };
             }
 
-			let parent = root.parent();
+            let parent = root.parent();
             if parent.is_some() {
                 let parent = parent.unwrap();
                 let name = root.file_name().unwrap();
@@ -69,51 +77,67 @@ impl Do {
                 } else {
                     let parent = Path::new(parent);
                     if parent.is_dir() {
-                        return Some(parent.canonicalize().unwrap().join(name).with_extension(ROOT));
+                        return Some(
+                            parent
+                                .canonicalize()
+                                .unwrap()
+                                .join(name)
+                                .with_extension(ROOT),
+                        );
                     } else {
-                        return None
+                        return None;
                     }
                 }
             }
 
             None
-		};
+        };
+        let mut args = std::env::args().skip(1);
 
-        let arg_len = args.len();
-
-        if arg_len < 1 {
+        if let None = args.next() {
             return WrongArgs("you need to specify a subcommand".into());
         }
 
-        let sub = args.pop_front().unwrap();
-        let sub = sub.as_str();
+        let sub = args.next().unwrap().to_owned();
+        let mut args = args.skip(1);
 
-		let mut root = env::temp_dir().join(ROOT);
+        let mut root = env::temp_dir().join(ROOT);
+        if let Some(path) = args.next() {
+            if let Some(p) = get_root(&path) {
+                root = p
+            }
+        }
 
-		if let Some(path) = args.pop_front() {
-    		if let Some(p) = get_root(path) {
-        		root = p
-    		}
-		}
-
-
-        use Do::*;
-        match sub {
+        use CliOpt::*;
+        match sub.as_str() {
+            "push" => StgPush(args.map(|a| a.to_string()).collect::<Vec<String>>(), root),
+            "pop" => StgPop(root),
             "spawn" => Spawn(root),
-            "kill" =>  Kill(root),
-            "eval" if arg_len > 4 => {
+            "kill" => Kill(root),
+            "eval" => {
+        		let mut args = args.map(|a| a.to_string()).collect::<VecDeque<String>>();
+        		if args.len() < 4 {
+                    return WrongArgs("wrong argument count".into());
+        		}
                 let socket = root.join(SOCKET);
                 match socket.try_exists() {
-                    Err(e) => return WrongArgs(format!("can't check existence of {root}: {e}", root = root.display())),
-                    Ok(exists) if !exists => return WrongArgs(format!("{socket:?} is invalid socket path")),
+                    Err(e) => {
+                        return WrongArgs(format!(
+                            "can't check existence of {root}: {e}",
+                            root = root.display()
+                        ))
+                    }
+                    Ok(exists) if !exists => {
+                        return WrongArgs(format!("{socket:?} is invalid socket path"))
+                    }
                     Ok(_) => {}
                 }
 
                 let this = ClientData {
                     session: args.pop_front().unwrap(),
                     client: args.pop_front().unwrap(),
-                    chunck: args.pop_back().unwrap(),
-                    chunck_args: args.into_iter().collect::<Vec<String>>(),
+                    chunk: args.pop_back().unwrap(),
+                    chunk_args: args.into_iter().collect::<Vec<String>>(),
                 };
 
                 Eval(Request::LuaExec(this), socket)
@@ -122,7 +146,6 @@ impl Do {
         }
     }
 }
-
 
 impl Request {
     fn send_to<P: AsRef<Path>>(&self, socket: P) -> Result<(), bincode::Error> {
@@ -133,6 +156,10 @@ impl Request {
         let stream = UnixStream::connect(socket)?;
         bincode::serialize_into(&stream, self)?;
         bincode::deserialize_from::<_, Request>(&stream)
+    }
+
+    fn send_back(&self, stream: &UnixStream) -> Result<(), bincode::Error> {
+        bincode::serialize_into(stream, self)
     }
 
     fn try_send_err<E: ToString>(&self, msg: &str, error: &E) -> Result<(), io::Error> {
@@ -156,9 +183,9 @@ struct GluaServer {
 impl Drop for GluaServer {
     fn drop(&mut self) {
         if self.root_path.is_dir() {
-             let _ = fs::remove_file(&self.root_path.join(SOCKET));
-             let _ = fs::remove_file(&self.root_path.join(PID_FILE));
-             let _ = fs::remove_dir(&self.root_path);
+            let _ = fs::remove_file(&self.root_path.join(SOCKET));
+            let _ = fs::remove_file(&self.root_path.join(PID_FILE));
+            let _ = fs::remove_dir(&self.root_path);
         }
     }
 }
@@ -182,6 +209,7 @@ impl GluaServer {
 
     fn run(self) {
         let mut last_request = Request::Continue;
+        let mut storage = Vec::<Vec<String>>::new();
         for stream in self.socket.incoming() {
             if let Err(ref stream_err) = stream {
                 let _ =
@@ -206,13 +234,13 @@ impl GluaServer {
             match request {
                 LuaExec(this) => match self.lua.call_chunk(this) {
                     Ok(ret_vals) => {
-                        let req_back = if ret_vals.is_empty() {
+                        let req = if ret_vals.is_empty() {
                             Continue
                         } else {
                             Return(ret_vals)
                         };
 
-                        if let Err(de_err) = bincode::serialize_into(&stream, &req_back) {
+                        if let Err(de_err) = req.send_back(&stream) {
                             let _ = last_request
                                 .try_send_err("Failed to receive return values from lua", &de_err);
                         }
@@ -222,6 +250,20 @@ impl GluaServer {
                         continue;
                     }
                 },
+                StgPop => {
+                    let saved = storage.pop();
+                    let req = if saved.is_none() {
+                        Continue
+                    } else {
+                        Return(saved.unwrap())
+                    };
+
+                    if let Err(e) = req.send_back(&stream) {
+                        let _ = last_request
+                            .try_send_err("Failed to return values from storage", &e);
+                    }
+                }
+                StgPush(data) =>  storage.push(data), 
                 Continue => continue,
                 Stop => break,
                 Return(_) => unreachable!("what?"),
@@ -231,10 +273,13 @@ impl GluaServer {
 }
 
 fn main() {
-    use Do::*;
-    match Do::this(std::env::args().skip(1).collect::<VecDeque<String>>()) {
+    use CliOpt::*;
+    match CliOpt::from_args() {
         Spawn(ref root) => match GluaServer::setup(root) {
-            Err(io_err) => println!("fail {SELF}::Error: Failed to spawn server in {root}: {io_err}", root = root.display()),
+            Err(io_err) => println!(
+                "fail {SELF}::Error: Failed to spawn server in {root}: {io_err}",
+                root = root.display()
+            ),
             Ok(server) => {
                 let socket_root = server.root_path.to_str().unwrap();
                 print_info(f!("Born in" socket_root.dqt()));
@@ -251,21 +296,32 @@ fn main() {
             }
         },
         Kill(root) => match Request::Stop.send_to(root.join(SOCKET)) {
-            Ok(()) => print_info(format!(
-                "Killed: {sock}",
-                 sock = root.display()
-            )),
+            Ok(()) => print_info(format!("Killed: {sock}", sock = root.display())),
             Err(io_err) => println!(
                 "fail {SELF}::Error: Failed to kill {sock}: {io_err}",
                 sock = root.display(),
             ),
         },
-        Eval(ref req, ref target) => match req.send_and_recv(target) {
+        StgPush(args, socket) => match Request::StgPush(args).send_to(socket) {
+            Err(e) => println!("fail {SELF}::Error: Failed to push data into storage: {e}"),
+            Ok(_) => print_info("Data saved"),
+        },
+        StgPop(socket) => match Request::StgPop.send_and_recv(socket) {
+            Err(e) => println!("fail {SELF}::Error: Failed to get data from storage: {e}"),
+            Ok(data) => {
+                if let Request::Return(vals) = data {
+                    for val in vals {
+                        println!("{val}");
+                    }
+                }
+            }
+        }
+        Eval(req, socket) => match req.send_and_recv(socket) {
             Err(io_err) => println!("fail {SELF}::Error: Failed to send lua chunck: {io_err}"),
             Ok(ret_vals) => {
                 if let Request::Return(vals) = ret_vals {
                     for val in vals {
-                        print!("{val}");
+                        println!("{val}");
                     }
                 }
             }

@@ -38,6 +38,11 @@ impl LuaServer for Lua {
             self.create_function(|lua, cmd: String| lua.kak_eval(cmd))?,
         )?;
 
+        kak.set(
+            "get",
+            self.create_function(|lua, vars: Variadic<String>| lua.kak_get(vars))?,
+        )?;
+
         globals.set(KAK, kak)?;
 
         Ok(())
@@ -73,11 +78,11 @@ impl LuaServer for Lua {
     }
 
     fn call_chunk(&self, data: ClientData) -> Result<Vec<String>> {
-        let args = self.mulit_value_from(data.chunck_args)?;
+        let args = self.mulit_value_from(data.chunk_args)?;
         self.set_data::<String>(SES, data.session)?;
         self.set_data::<String>(CLIENT, data.client)?;
         let vals = self
-            .load(&data.chunck)
+            .load(&data.chunk)
             .call::<MultiValue, MultiValue>(args)?;
         let mut result = Vec::<String>::new();
         for val in vals.into_iter() {

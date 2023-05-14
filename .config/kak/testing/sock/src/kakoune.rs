@@ -1,9 +1,11 @@
-use crate::{f, utils::*, SELF};
+use crate::{f, utils::*, SELF, VAL_HANLDR};
 use std::{
     fs::File,
     io::{self, Read, Write},
     os::unix::net::UnixStream,
+    path::Path,
 };
+// TODO: deal with temp fifo
 
 const VAL_SEP: &str = "§";
 
@@ -27,37 +29,27 @@ pub fn kak_get_values<I: IntoIterator<Item = String>>(
     client: &str,
     vars: I,
 ) -> Result<Vec<String>, io::Error> {
-    let fifo: tempfile::TempPath;
-    loop {
-        match temp_fifo_in(std::path::Path::new(temp_path)) {
-            Some(path) => {
-                fifo = path;
-                break;
-            }
-            None => continue,
-        }
-    }
+    let fifo = temp_fifo_in(Path::new(temp_path))?;
 
-    let val_handle = SELF.and("_value_handler");
     let mut cmd =
-        f!("declare-option -hidden str" val_handle "; set-option global" val_handle "''; ");
+        f!("declare-option -hidden str" VAL_HANLDR "; set-option global" VAL_HANLDR "''; ");
 
     for var in vars.into_iter() {
         let var = var.to_string();
         cmd.push_str(&try_catch(
-            f!("set -add global" val_handle var.and(VAL_SEP).dqt()),
-            f!("set -add global" val_handle "nil".and(VAL_SEP).dqt()),
+            f!("set -add global" VAL_HANLDR var.and(VAL_SEP).dqt()),
+            f!("set -add global" VAL_HANLDR "nil".and(VAL_SEP).dqt()),
         ));
         cmd.push_str("; ");
     }
 
-    let fifo_path = fifo.to_str().unwrap();
-    cmd.push_str(&f!("echo -to-file" fifo_path.qt() val_handle.as_opt().dqt()));
+    let fifo_path = fifo.path.to_str().unwrap();
+    cmd.push_str(&f!("echo -to-file" fifo_path.qt() VAL_HANLDR.as_opt().dqt()));
 
     kak_send_client(session, client, &cmd)?;
 
     let mut values = String::new();
-    File::open(fifo)?.read_to_string(&mut values)?;
+    File::open(&fifo.path)?.read_to_string(&mut values)?;
 
     Ok(values
         .split_terminator(VAL_SEP)

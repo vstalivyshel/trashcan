@@ -1,4 +1,5 @@
-use crate::SELF;
+use crate::{SELF, TEMP_FIFO};
+use std::path::PathBuf;
 use std::{ffi::CString, io, os::unix::ffi::OsStrExt, path::Path};
 
 #[macro_export]
@@ -18,17 +19,25 @@ pub fn print_info<S: std::fmt::Display>(msg: S) {
     println!("echo -markup {{Information}}{SELF}::Info: {msg}");
 }
 
-pub fn temp_fifo_in<P: AsRef<Path>>(path: P) -> Option<tempfile::TempPath> {
-    let temp_path = tempfile::TempPath::from_path(
-        path.as_ref()
-            .join(format!("{SELF}_temp_fifo_{:?}", rand::random::<u64>())),
-    );
+pub struct TempFifo {
+    pub path: PathBuf,
+}
 
-    if let Err(_) = create_fifo(&temp_path, 0o777) {
-        None
-    } else {
-        Some(temp_path)
+impl Drop for TempFifo {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
     }
+}
+
+pub fn temp_fifo_in<P: AsRef<Path>>(path: P) -> Result<TempFifo, io::Error> {
+    let path = path
+        .as_ref()
+        .join(format!("{:?}", rand::random::<u64>()))
+        .with_extension(TEMP_FIFO);
+
+	create_fifo(&path, 0o777)?;
+
+	Ok(TempFifo {path})
 }
 
 pub fn create_fifo<P: AsRef<Path>>(path: &P, mode: libc::mode_t) -> Result<(), io::Error> {
@@ -171,3 +180,4 @@ impl<T: StringExt, I: IntoIterator<Item = T>> StringExtChain for I {
 pub fn try_catch<S: StringExt>(try_cmd: S, catch_cmd: S) -> String {
     f!("try".and_kakqt(try_cmd) "catch".and_kakqt(catch_cmd))
 }
+
