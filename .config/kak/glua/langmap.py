@@ -3,8 +3,8 @@
 import sys
 
 DEFAULT = "en"
-SCOPE = "buffer"
-MODE = "insert"
+ALT = "ru"
+
 LANGMAP = {
     "en": "`~1!2@3#4$5%6^7&8*9(0)_=+\\|qQwWeErRtTyYuUiIoOpP[{]}aAsSdDfFgGhHjJkKlL;:'\"zZxXcCvVbBnNmM,<.>/?",
     "ru": 'ёЁ1!2"3№4;5%6:7?8*9(0)_=+\\/йЙцЦуУкКеЕнНгГшШщЩзЗхХъЪфФыЫвВаАпПрРоОлЛдДжЖэЭяЯчЧсСмМиИтТьЬбБюЮ.,',
@@ -13,27 +13,19 @@ LANGMAP = {
 
 
 def main():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 1:
         return
 
-    current_lang = sys.argv[1]
-    alt_lang = sys.argv[2]
-
-    if alt_lang == DEFAULT:
-        return
-    elif alt_lang not in LANGMAP.keys():
-        return
-    elif len(alt_lang) != len(DEFAULT):
-        return
+    current = sys.argv[1]
 
     action = "map"
-    if current_lang == alt_lang:
+    if current == ALT:
         action = "unmap"
 
     default = list(LANGMAP.get(DEFAULT))
-    alt = list(LANGMAP.get(alt_lang))
+    alt = list(LANGMAP.get(ALT))
     for i in range(len(default)):
-        print(f"{action} {SCOPE} {MODE} %§{default[i]}§ %§{alt[i]}§")
+        print(f"{action} global insert %§{default[i]}§ %§{alt[i]}§")
 
 
 if __name__ == "__main__":

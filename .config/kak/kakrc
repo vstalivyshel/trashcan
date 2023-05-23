@@ -1,42 +1,9 @@
-colorscheme rose-pine-moon
+colorscheme lotus
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
-
 declare-option -hidden str glua "%val{config}/glua"
 
-provide-module -override glua %{
-    decl str glua_exe "%val{config}/testing/sock/target/debug/glua"
-    decl str glua_root "%val{config}/testing/test"
-    decl str-list glua_pop 
-
-    def glua-eval -override -params 1.. %{
-        eval %sh{ "$kak_opt_glua_exe" eval "$kak_opt_glua_root" "$kak_session" "$kak_client" "$@"}
-    }
-
-    def glua-start -override %{
-        eval %sh{ "$kak_opt_glua_exe" spawn "$kak_opt_glua_root" }
-    }
-
-    def glua-stop -override %{
-        eval %sh{ "$kak_opt_glua_exe" kill "$kak_opt_glua_root" } 
-    }
-
-    def glua-stg-push -override -params 1.. %{
-        eval %sh{ "$kak_opt_glua_exe" push "$kak_opt_glua_root" $@}
-    }
-
-    def glua-stg-pop -override %{
-        set global glua_pop %sh{ "$kak_opt_glua_exe" pop "$kak_opt_glua_root" }
-    }
-}
-
-require-module glua
-alias global lua glua-eval
-
-# ------------------------------------------------------------------------------
-# ------------------------------------------------------------------------------
-
-    add-highlighter -override global/ number-lines -relative -hlcursor -separator ' '
+add-highlighter -override global/ number-lines -relative -hlcursor -separator ' '
 add-highlighter -override global/ show-matching 
 set global ui_options terminal_assistant=none
 set global tabstop 4
@@ -188,10 +155,10 @@ hook global -group auto-pairs InsertChar '(\(|\[|\Q"\E|\{|<)' \
 #------------------------------------------------------------------------------
 # little helper----------------------------------------------------------------
 
-def switch-selections \
+def swap-selections \
 -override \
 %{ try %{ exec '<a-z>a<a-)>' } }
-map global normal <a-r> ':switch-selections<ret>'
+map global normal <a-r> ':swap-selections<ret>'
 
 def jump-to-mark \
 -override \
@@ -218,6 +185,7 @@ def surround-selection \
         o="$kak_key"
         c=
     	case "$o" in
+        	"<esc>") exit 0 ;;
             "<lt>" | "<gt>") o="<" c=">" ;;
             "(" | ")") o="(" c=")" ;;
         	"[" | "]") o="[" c="]" ;;
@@ -245,8 +213,8 @@ define-command kak-talk \
 -override \
 -command-completion \
 -params .. \
- %{ nop %sh{ katalk $@ } }
-alias global kak kak-talk 
+ %{ nop %sh{ glua evalall $@ } }
+alias global evalall kak-talk 
 
 define-command find-file \
 -docstring 'Fuzzy search for the files'\
@@ -300,15 +268,10 @@ define-command new-file \
 %{ echo %sh{ touch "$@" }; edit %arg{1} }
 alias global nf new-file
 
-
 #------------------------------------------------------------------------------
 # langmap ---------------------------------------------------------------------
 
-declare-option str def_langmap "en"
-    declare-option str alt_langmap "ru"
-declare-option str current_langmap %opt{def_langmap}
-declare-option str langmap_me "%opt{glua}/langmap.py"
-
+declare-option str current_langmap 'en'
 set-option global modelinefmt \
 '%val{bufname} %val{cursor_line}:%val{cursor_char_column} 
 {{context_info}} {{mode_info}} - %val{client}@[%val{session}] - (%opt{current_langmap})'
@@ -316,14 +279,9 @@ set-option global modelinefmt \
 define-command toggle-langmap \
 -override \
 %{ evaluate-commands %sh{
-    current=
-    def="$kak_opt_def_langmap"
-    alt="$kak_opt_alt_langmap"
-    case "$kak_opt_current_langmap" in
-"$def") current="$alt" ;;
-        "$alt") current="$def" ;;
-    esac
-    "$kak_opt_langmap_me" "$kak_opt_current_langmap" "$kak_opt_alt_langmap"
+    current="en"
+    [ "$kak_opt_current_langmap" == "$current" ] && current="ru"
+    "$kak_opt_glua/langmap.py" "$kak_opt_current_langmap"
     echo "set buffer current_langmap $current"
 } }
 map global insert '<c-^>' '<a-;>:toggle-langmap<ret>'
@@ -341,14 +299,15 @@ hook buffer -group auto-save ModeChange '.*:insert:.*' \
 def disable-auto-save -override %{ rmhooks buffer auto-save }
 
 #------------------------------------------------------------------------------
-# Fromat
-hook global WinSetOption filetype=(rust|lua|python) \
+# Format
+hook global WinSetOption filetype=(rust|lua|python|zig) \
  %{ evaluate-commands %sh{
      fmt_cmd=
      case "$kak_opt_filetype" in
          "rust") fmt_cmd="rustfmt" ;;
          "lua") fmt_cmd="stylua" ;;
          "python") fmt_cmd="black" ;;
+         "zig") fmt_cmd="zig fmt" ;;
      esac
      if ! type "$fmt_cmd" &> /dev/null; then
      	printf %s "fail Install $fmt_cmd for $kak_buffile"
