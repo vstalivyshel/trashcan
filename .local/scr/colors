@@ -18,8 +18,7 @@ kakoune="$HOME/.config/kak/kakrc"
 ala_path="$HOME/.config/alacritty"
 ala="$ala_path/alacritty.yml"
 
-
-katalk "colorscheme $selected_theme"
+glua evalall "colorscheme $selected_theme"
 
 if [[ -f "$ala" ]]; then
     sed -i "s#- /.*#- $ala_path/$selected_theme.yml#" "$ala"

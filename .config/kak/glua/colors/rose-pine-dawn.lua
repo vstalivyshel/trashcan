@@ -65,10 +65,10 @@ return {
     func                   = rose,
     string                 = gold,
     keyword                = pine,
-    operator               = text,
+    operator               = subtle,
     attribute              = iris,
     comment                = {muted, "+i"},
-    documentationcomment,
+    documentation          = comment,
     meta                   = rose,
     builtin                = {rose, "+b"},
 

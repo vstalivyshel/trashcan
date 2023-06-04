@@ -136,6 +136,7 @@ require("lazy").setup({
 		end,
 		lazy = false,
 	},
+	{ 'iamcco/markdown-preview.nvim', lazy = false, },
 	{ "windwp/nvim-autopairs", config = true, event = "InsertEnter" },
 	{ "norcalli/nvim-colorizer.lua", cmd = "ColorizerToggle" },
 	{ "rose-pine/neovim", name = "rose-pine", lazy = false },
