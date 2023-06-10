@@ -80,29 +80,49 @@ map global user M ':make-color-current-file<ret>' \
     -docstring 'Generate colorscheme from current lua specs'
 
 # ------------------------------------------------------------------------------
-# splits ----------------------------------------------------------------------
+# repl -------------------------------------------------------------------------
 
 declare-user-mode window-mode
 map global normal <c-w> ":enter-user-mode window-mode<ret>"
 
-define-command term-vsplit \
--docstring 'Open shell in vertical split' \
--override \
-%{ tmux-terminal-horizontal $SHELL  }
-map global window-mode 'V' ':term-vsplit<ret>'
+map global window-mode 'V' ':tmux-repl-horizontal<ret>' \
+-docstring 'Open shell in vertical split'
+map global window-mode 'S' ':tmux-repl-vertical<ret>' \
+-docstring 'Open shell in vertical split'
+map global window-mode 'T' ':tmux-repl-window<ret>' \
+-docstring 'Open shell in vertical split'
 
-define-command term-hsplit \
--docstring 'Open shell in horizontal split' \
+define-command repl-eval-text \
+-docstring "repl-eval-text [text-to-eval]: Evaluate text at the REPL\n
+If no text is passed, then the selection is used" \
 -override \
-%{ tmux-terminal-vertical $SHELL  }
-map global window-mode 'S' ':term-hsplit<ret>'
+-params ..1 %{
+    eval %sh{
+        if [ $# -eq 0 ]; then
+            printf "%s\n" "repl-send-text"
+        else
+            printf "%s %s\n" "repl-send-text %{$1}"
+        fi
+    }
+    nop %sh{tmux send -t $kak_opt_tmux_repl_id "" C-m}
+}
+map global user R ':repl-eval-text<ret>'
 
-define-command term-tab \
--docstring 'Open shell in tab' \
+define-command repl-send-prompt \
 -override \
-%{ tmux-terminal-window $SHELL  }
-map global window-mode 'T' ':term-hsplit<ret>'
+-params ..1 \
+%{ prompt 'repl-cmd ' %{ repl-eval-text %val{text}} }
+map global user r ':repl-send-prompt<ret>'
 
+
+define-command repl-eval-last-command \
+-override \
+-docstring "repl-eval-last-command: Re-run the last executed command at the REPL" \
+ %{ nop %sh{tmux send -t $kak_opt_tmux_repl_id "Up" C-m} }
+ map global user <a-r> ':repl-eval-last-command<ret>'
+
+# ------------------------------------------------------------------------------
+# splits ----------------------------------------------------------------------
 
 declare-option -hidden str for_splits
 declare-option -hidden str split_cmd 
@@ -178,14 +198,13 @@ eval %sh{
     spc=""
     [ "$1" == true ] && spc=" "
     o="$kak_key"
-    c=
+    c="$kak_key"
 	case "$o" in
     	"<esc>") exit 0 ;;
         "<lt>" | "<gt>") o="<" c=">" ;;
         "(" | ")") o="(" c=")" ;;
     	"[" | "]") o="[" c="]" ;;
     	"{") c="}" ;;
-    	*) c+="$o" ;;
 	esac
 	o="$o$spc"
 	c="$spc$c"
@@ -197,7 +216,7 @@ exec -draft -itersel '"mZ"oP"mz"cp"mz'
 map global normal <a-'> ':surround-selection false<ret>'
 map global normal <a-"> ':surround-selection true<ret>'
 
-    define-command auto-info \
+define-command auto-info \
 -docstring 'command|onkey|normal' \
 -override \
 -params 1 \
@@ -223,7 +242,7 @@ define-command ls \
 -docstring 'List files in the current directory' \
 -override \
 %{ info -title "%val{buffile}" %sh{ ls -Alh } }
-map global normal <c-g> ":ls<ret>"
+map global normal <c-l> ":ls<ret>"
 
 define-command sh \
 -override \
@@ -236,7 +255,7 @@ define-command close-buffers \
 -buffer-completion \
 -params 1.. \
 %{ evaluate-commands %sh{
-    cmd=
+cmd=
     for b; do
 		cmd+="db '$b'; "
     done
@@ -282,19 +301,16 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 #------------------------------------------------------------------------------
 # Autosave
 define-command enable-auto-save -override  %{ 
-    hook buffer -group auto-save NormalKey 'c|(?i)(d|p|u|r)' \
+hook buffer -group auto-save NormalKey '.*' \
     %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
-hook buffer -group auto-save ModeChange '.*:.*:insert' \
-    %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
-hook buffer -group auto-save ModeChange '.*:insert:.*' \
+hook buffer -group auto-save InsertKey '.*' \
     %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
 }
 def disable-auto-save -override %{ rmhooks buffer auto-save }
 
 #------------------------------------------------------------------------------
-#------------------------------------------------------------------------------
+#fmt --------------------------------------------------------------------------
 
-declare-option str runcmd 
 hook -group filetype-config global WinSetOption filetype=(rust|lua|python|zig) \
  %{ evaluate-commands %sh{
     fmt_cmd=
@@ -302,15 +318,15 @@ hook -group filetype-config global WinSetOption filetype=(rust|lua|python|zig) \
     with_file=true
     file="$kak_buffile"
     case "$kak_opt_filetype" in
-        "rust") fmt_cmd="rustfmt" run_cmd="cargo build" ;;
-        "lua") fmt_cmd="stylua" run_cmd="luajit $file";;
-        "python") fmt_cmd="black" run_cmd="python3 $file";;
-        "zig") fmt_cmd="zig fmt" run_cmd="zig run $file";;
+        "rust") fmt_cmd="rustfmt";;
+        "lua") fmt_cmd="stylua";;
+        "python") fmt_cmd="black";;
+        "zig") fmt_cmd="zig fmt";;
     esac
     if ! type "$fmt_cmd" &> /dev/null; then
         printf %s "fail No such command: $fmt_cmd"
     else
-        printf %s "set window formatcmd %{$fmt_cmd} ; set window runcmd %{$run_cmd}"
+        printf %s "set window formatcmd %{$fmt_cmd}"
     fi
  } }
 
@@ -324,71 +340,11 @@ define-command evalall \
 -params 1.. \
  %{ eval %sh{ glua evalall $@ } }
 
- define-command run \
+ define-command pipe \
  -docstring "Pipe shell output into new buffer" \
  -shell-completion \
  -params 1.. \
  %{ e -fifo %sh{ glua pipe $@ } "*pipe-output*" }
-
-define-command compile \
--docstring 'Compile current file and pipe output into a vertical split' \
--override \
--params .. \
-%{ edit -fifo %sh{ glua pipe $kak_opt_runcmd $@ } "*%opt{filetype}-compile*" }
-map global user r ':compile<ret>' \
-    -docstring 'Execute current file in vertical split'
-
-define-command compile-vsplit \
--docstring 'Compile current file and pipe output into a vertical split' \
--override \
--params .. \
-%{ buf-vsplit %{ compile %arg{@} } }
- map global user R ':compile-vsplit<ret>' \
-    -docstring 'Execute current file in vertical split'
-
-define-command compile-hsplit \
--docstring 'Compile current file and pipe output into a horizontal split' \
--override \
--params .. \
-%{ buf-hsplit %{ compile %arg{@} } }
- map global user <a-r> ':compile-hsplit<ret>' \
-    -docstring 'Execute current file in horizontal split'
-
-#------------------------------------------------------------------------------
-#------------------------------------------------------------------------------
-# cargo
-
-declare-option -hidden regex cargo_error_pattern \
-    "^\h*(?:error|warning|note)(?:\[[A-Z0-9]+\])?: ([^\n]*)\n *--> ([^\n]*?):(\d+)(?::(\d+))?"
-
-define-command -override -hidden cargo-open-error -params 4 %{
-evaluate-commands %{
-    edit -existing "%arg{1}" "%arg{2}" "%arg{3}"
-    info -anchor "%arg{2}.%arg{3}" "%arg{4}"
-} }
-
-define-command -override -hidden cargo-jump %{
-evaluate-commands %{
-    execute-keys "/" %opt{cargo_error_pattern} <ret>
-    execute-keys <a-/> %opt{cargo_error_pattern} <ret><a-:> "<a-;>"
-    cargo-open-error \
-        "%reg{2}" \
-        "%reg{3}" \
-        "%sh{ echo ${kak_main_reg_4:-1} }" \
-        "%reg{1}"
-} }
-
-add-highlighter shared/cargo group
-add-highlighter shared/cargo/ regex "^(error(?:\[[A-Z0-9]+\])?:)" 1:red
-add-highlighter shared/cargo/ regex "^(warning(?:\[[A-Z0-9]+\])?:)" 1:yellow
-add-highlighter shared/cargo/ regex "^(note(?:\[[A-Z0-9]+\])?:)" 1:green
-add-highlighter shared/cargo/ regex "^ +\|[ |]+(-+[^\n]*)$" 1:cyan
-add-highlighter shared/cargo/ regex "^ +\|[ |]+(\^+[^\n]*)$" 1:red
-
-hook -group rust-compile global BufCreate '\*rust-compile\*' %{
-    add-highlighter buffer/cargo ref cargo
-    map buffer normal <ret> ':cargo-jump<ret>'
-}
 
 #------------------------------------------------------------------------------
 # LSP -------------------------------------------------------------------------

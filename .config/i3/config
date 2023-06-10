@@ -199,8 +199,6 @@ hide_edge_borders smart
 
 for_window [class="^.*"] border pixel 3
 
-assign [class="firefox"] 1
-
 exec --no-startup-id firefox
 exec --no-startup-id workspace 2; $term -e tmux
 
