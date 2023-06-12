@@ -11,6 +11,8 @@ set global tabstop 4
 set global scrolloff 15,0
 set global startup_info_version 999999999
 set global autocomplete prompt
+set global autoinfo 'command'
+
 
 hook global -group insert-color ModeChange .*:.*:insert %{
     set-face window PrimaryCursor InsertCursor
@@ -216,12 +218,6 @@ exec -draft -itersel '"mZ"oP"mz"cp"mz'
 map global normal <a-'> ':surround-selection false<ret>'
 map global normal <a-"> ':surround-selection true<ret>'
 
-define-command auto-info \
--docstring 'command|onkey|normal' \
--override \
--params 1 \
-%{ set buffer autoinfo %arg{@} }
-
 define-command find-file \
 -docstring 'Fuzzy search for the files'\
 -override \
@@ -314,11 +310,7 @@ def disable-auto-save -override %{ rmhooks buffer auto-save }
 hook -group filetype-config global WinSetOption filetype=(rust|lua|python|zig) \
  %{ evaluate-commands %sh{
     fmt_cmd=
-    run_cmd=
-    with_file=true
-    file="$kak_buffile"
     case "$kak_opt_filetype" in
-        "rust") fmt_cmd="rustfmt";;
         "lua") fmt_cmd="stylua";;
         "python") fmt_cmd="black";;
         "zig") fmt_cmd="zig fmt";;
@@ -326,7 +318,7 @@ hook -group filetype-config global WinSetOption filetype=(rust|lua|python|zig) \
     if ! type "$fmt_cmd" &> /dev/null; then
         printf %s "fail No such command: $fmt_cmd"
     else
-        printf %s "set window formatcmd %{$fmt_cmd}"
+        printf %s "set window formatcmd %{$fmt_cmd $kak_buffile}"
     fi
  } }
 
