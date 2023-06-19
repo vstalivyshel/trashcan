@@ -1,7 +1,6 @@
 if status is-interactive
-    # fish_add_path -Ua $HOME/.cargo/bin $HOME/.local/bin $HOME/.local/scr
-
-    set -xga PKG_CONFIG_PATH /usr/lib64/pkgconfig /usr/lib/x86_64-linux-gnu/pkgconfig
+    fish_add_path /usr/local/texlive/2023/bin/x86_64-linux
+    set -xga PKG_CONFIG_PATH /usr/lib64/pkgconfig /usr/lib/x86_64-linux-gnu/pkgconfig 
     set fish_cursor_default block
     set -Ux EDITOR kak
     set -Ux VISUAL $EDITOR

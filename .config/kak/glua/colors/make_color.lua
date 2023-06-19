@@ -1,4 +1,4 @@
-#!/bin/env luajit
+#!/bin/env lua
 
 local io = io
 local os = os
