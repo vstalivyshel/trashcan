@@ -67,7 +67,7 @@ return {
     attribute              = iris,
     comment                = {muted, "+i"},
     operator               = subtle,
-    documentation          = comment,
+    documentation          = "comment",
     meta                   = rose,
     builtin                = {rose, "+b"},
 

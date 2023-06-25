@@ -157,7 +157,7 @@ return {
     builtin                = {lotus.syn.statement, "+b"},
 
     --- LSP ---
-    DiagnosticError        = "Error",
+    DiagnosticError        = lotus.diag.error,
     DiagnosticWarning      = lotus.diag.warning,
     DiagnosticHint         = lotus.diag.hint,
     DiagnosticInfo         = lotus.diag.info,

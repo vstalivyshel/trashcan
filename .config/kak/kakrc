@@ -24,6 +24,32 @@ hook global -group insert-color ModeChange .*:insert:.* %{ try %{
 } }
 
 #------------------------------------------------------------------------------
+#usm-filetype -----------------------------------------------------------------
+
+hook global BufCreate .*[.](usm) %{
+    set-option buffer filetype usm
+}
+
+hook global WinSetOption filetype=usm %{
+    require-module usm
+	set window comment_line ';;'
+    add-highlighter window/usm ref usm
+    hook -once -always window WinSetOption filetype=.* %{ remove-highlighter window/usm }
+    hook -once -always window WinSetOption filetype=.* %{ remove-hooks window usm-.+ }
+}
+
+provide-module usm %{
+    add-highlighter shared/usm regions
+    add-highlighter shared/usm/code default-region group
+    add-highlighter shared/usm/double_string region '"'   (?<!\\)(?:\\\\)*" fill string
+    add-highlighter shared/usm/single_string region "'"   (?<!\\)(?:\\\\)*' fill string
+    add-highlighter shared/usm/comment       region ';;'  $                 fill comment
+    add-highlighter shared/usm/code/value regex \b([0-9]+(:?\.[0-9])?(:?[eE]-?[0-9]+)?|0x[0-9a-fA-F]|[0-9]+_(дроб|зціл|ціл))\b 0:value
+    add-highlighter shared/usm/code/extern_func regex (%\w+) 0:function
+    add-highlighter shared/usm/code/label regex (\w+:) 0:keyword
+}
+
+#------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
 map global insert <c-w> '<a-;>h<a-;>b<a-;>"_d'
@@ -180,8 +206,7 @@ def pdf-compile \
     [ ${file##*.} != 'tex' ] && fail 'Not in a latex document'
     ! type pdflatex > /dev/null && fail '`pdflatex` is not installed'
     printf %s "
-    terminal %{ pdflatex $file }
-    "
+    terminal %{ pdflatex -output-directory=$(dirname $file) $file && pkill -HUP mupdf }"
 } }
 
 def pdf-open \
@@ -336,13 +361,17 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 
 #------------------------------------------------------------------------------
 # Autosave
-define-command enable-auto-save -override  %{ 
+
+decl -hidden bool auto_save_enabled false
+define-command enable-auto-save -override  %{
+eval %sh{ [ $kak_opt_auto_save_enabled == true ] && printf %s "fail Auto Save already enabled" }
+set buffer auto_save_enabled true
 hook buffer -group auto-save NormalKey '.*' \
     %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
 hook buffer -group auto-save InsertKey '.*' \
     %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
 }
-def disable-auto-save -override %{ rmhooks buffer auto-save }
+def disable-auto-save -override %{ rmhooks buffer auto-save; set buffer auto_save_enabled false }
 
 #------------------------------------------------------------------------------
 #fmt --------------------------------------------------------------------------

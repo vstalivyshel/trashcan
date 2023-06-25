@@ -1,6 +1,5 @@
 #!/bin/env bash
 
-# kakoune
 themes=( "gruv-light" "rose-pine-moon" "rose-pine-dawn" "rose-pine" "kanagawa" "lotus")
 
 choices=""
@@ -10,23 +9,17 @@ done
 
 selected_theme=$(printf "$choices" | fzy)
 
-if [[ -z $selected_theme ]]; then
-    exit 0
-fi
+[[ -z $selected_theme ]] && exit 0
 
 kakoune="$HOME/.config/kak/kakrc"
 ala_path="$HOME/.config/alacritty"
 ala="$ala_path/alacritty.yml"
 
-glua evalall "colorscheme $selected_theme"
+for s in $(kak -l); do
+	printf %s "colorscheme $selected_theme" | kak -p "$s"
+done
 
-if [[ -f "$ala" ]]; then
-    sed -i "s#- /.*#- $ala_path/$selected_theme.yml#" "$ala"
-fi
+[[ -f "$ala" ]] && sed -i "s#- /.*#- $ala_path/$selected_theme.yml#" "$ala"
 
- # sed -i "s#- ~/*#some#" ./alacritty.yml
-
-if [[ -f "$kakoune" ]]; then
-    sed -i "s/^colorscheme.*/colorscheme $selected_theme/" "$kakoune"
-fi
+[[ -f "$kakoune" ]] && sed -i "s/^colorscheme.*/colorscheme $selected_theme/" "$kakoune"
 
