@@ -1,5 +1,6 @@
 # This file contains fish universal variable definitions.
 # VERSION: 3.0
+SETUVAR --export CARGO_NET_GIT_FETCH_WITH_CLI:true
 SETUVAR --export EDITOR:kak
 SETUVAR FZF_DEFAULT_COMMAND:fd\x1e\x2d\x2dhidden
 SETUVAR --export --path LUA_PATH:

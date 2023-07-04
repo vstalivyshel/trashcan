@@ -81,15 +81,15 @@ map global user p '<a-!>xsel --output --clipboard<ret>'\
     -docstring 'Paste before a seletction from the system clipboard'
 
 evaluate-commands %sh{
-    keys=( "h" "j" "k" "l"  "H" "J" "K" "L" )
-    keys+=("o" "I" "O" "A" )
-    keys+=("t" "T" "f" "F" "g" "G" "]" "[" )
-    keys+=("b" "w" "e"  "B" "W" "E" )
-    keys+=("x" "X")
-    keys+=("c" "C" "d")
-    keys+=("m" "M" "n" "N")
+    keys='h j k l H J K L '
+    keys+='o I O A ' 
+    keys+='t T f F g G ] [ ' 
+    keys+='b w e B W E ' 
+    keys+='x X '
+    keys+='c C d '
+    keys+='m M n N '
     cmd=""
-    for k in "${keys[@]}"; do
+    for k in $keys; do
         cmd+="map global insert <a-$k> '<esc>$k' ; "
 	done
 	printf %s "eval %{ $cmd }"
@@ -260,11 +260,11 @@ map global user \' ":surround-selection-custom<ret>" \
 
 def surround-selection \
 -override \
--params 1 \
+-params ..1 \
 %{ on-key %{ eval -save-regs 'oc' %{
 eval %sh{
     spc=""
-    [ "$1" == true ] && spc=" "
+    [ -n "$1" ] && spc=" "
     o="$kak_key"
     c="$kak_key"
 	case "$o" in
@@ -281,7 +281,7 @@ eval %sh{
 }
 exec -draft -itersel '"mZ"oP"mz"cp"mz'
 } } }
-map global normal <a-'> ':surround-selection false<ret>'
+map global normal <a-'> ':surround-selection<ret>'
 map global normal <a-"> ':surround-selection true<ret>'
 
 define-command find-file \
@@ -314,12 +314,13 @@ define-command sh \
 
 define-command close-buffers \
 -override \
--menu \
 -buffer-completion \
--params 1.. \
-%{ evaluate-commands %sh{
+-params 1 \
+%{ eval %sh{
     cmd=
-    for b; do cmd+="db '$b'; "; done
+    for b in $kak_buflist; do
+    	[[ "$b" =~ $1 ]] && cmd+="db '$b'; " 
+    done
     printf %s "$cmd" 
 } }
 
@@ -364,14 +365,16 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 
 decl -hidden bool auto_save_enabled false
 define-command enable-auto-save -override  %{
-eval %sh{ [ $kak_opt_auto_save_enabled == true ] && printf %s "fail Auto Save already enabled" }
-set buffer auto_save_enabled true
-hook buffer -group auto-save NormalKey '.*' \
-    %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
-hook buffer -group auto-save InsertKey '.*' \
-    %{ eval %sh{ if [ $kak_modified == true ]; then printf %s "w"; fi  } }
+    eval %sh{ [ $kak_opt_auto_save_enabled == true ] && printf %s "fail Auto Save already enabled" }
+    hook buffer -group auto-save NormalKey '.*' \
+        %{ eval %sh{ [ $kak_modified == true ] && printf %s "w"  } }
+    set buffer auto_save_enabled true
 }
-def disable-auto-save -override %{ rmhooks buffer auto-save; set buffer auto_save_enabled false }
+def disable-auto-save -override %{
+    eval %sh{ [ $kak_opt_auto_save_enabled == false ] && printf %s "fail Auto Save already disabled" }
+    rmhooks buffer auto-save
+    set buffer auto_save_enabled false
+}
 
 #------------------------------------------------------------------------------
 #fmt --------------------------------------------------------------------------
