@@ -1,4 +1,4 @@
-colorscheme lotus
+colorscheme gruv-light
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 declare-option -hidden str glua "%val{config}/glua"
@@ -8,7 +8,7 @@ add-highlighter -override global/ number-lines -relative -hlcursor -separator ' 
 add-highlighter -override global/ show-matching 
 set global ui_options terminal_assistant=none
 set global tabstop 4
-set global scrolloff 15,0
+set global scrolloff 15,15
 set global startup_info_version 999999999
 set global autocomplete prompt
 set global autoinfo 'command'

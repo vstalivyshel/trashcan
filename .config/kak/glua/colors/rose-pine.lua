@@ -58,7 +58,7 @@ return {
     BufferPadding          = base,
 
     --- Code ---
-    value                  = {iris, "+b"},
+    value                  = love,
     type                   = foam,
     variable               = text,
     module                 = iris,
@@ -70,7 +70,7 @@ return {
     operator               = subtle,
     documentation          = "comment",
     meta                   = rose,
-    builtin                = {rose, "+b"},
+    builtin                = love,
 
     --- LSP ---
     DiagnosticError        = love,
