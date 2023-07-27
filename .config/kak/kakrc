@@ -1,4 +1,4 @@
-colorscheme gruv-light
+colorscheme lotus
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 declare-option -hidden str glua "%val{config}/glua"
@@ -98,7 +98,7 @@ evaluate-commands %sh{
 #------------------------------------------------------------------------------
 # colors ----------------------------------------------------------------------
 
-define-command make-color-current-file -override -command-completion %{
+def make-color-current-file -override -command-completion %{
 eval %sh{
     file="$kak_opt_filetype"
     if [ $file != "lua" ]; then
@@ -123,7 +123,7 @@ map global window-mode 'S' ':tmux-repl-vertical<ret>' \
 map global window-mode 'T' ':tmux-repl-window<ret>' \
 -docstring 'Open shell in vertical split'
 
-define-command repl-eval-text \
+def repl-eval-text \
 -docstring "repl-eval-text [text-to-eval]: Evaluate text at the REPL\n
 If no text is passed, then the selection is used" \
 -override \
@@ -133,14 +133,14 @@ nop %sh{ tmux send -t $kak_opt_tmux_repl_id "" C-m }
 }
 map global user R ':repl-eval-text<ret>'
 
-define-command repl-send-prompt \
+def repl-send-prompt \
 -override \
 -params ..1 \
 %{ prompt 'repl-cmd ' %{ repl-eval-text %val{text}} }
 map global user r ':repl-send-prompt<ret>'
 
 
-define-command repl-eval-last-command \
+def repl-eval-last-command \
 -override \
 -docstring "repl-eval-last-command: Re-run the last executed command at the REPL" \
  %{ nop %sh{tmux send -t $kak_opt_tmux_repl_id "Up" C-m} }
@@ -152,26 +152,26 @@ define-command repl-eval-last-command \
 declare-option -hidden str for_splits
 declare-option -hidden str split_cmd 
 
-define-command -hidden split-it-boy -params .. %{
+def -hidden split-it-boy -params .. %{
     set buffer for_splits "e %val{buffile} ; select %val{selection_desc} ; exec vv; %arg{@}"
     %opt{split_cmd} kak -c %val{session} -e %opt{for_splits}
 }
 
-define-command buf-vsplit \
+def buf-vsplit \
 -override \
 -params .. \
 %{ set buffer split_cmd "tmux-terminal-horizontal" ; split-it-boy %arg{@} }
 map global window-mode v ":buf-vsplit<ret>" \
     -docstring 'Open current buffer in vertical split'
 
-define-command buf-hsplit \
+def buf-hsplit \
 -override \
 -params .. \
 %{ set buffer split_cmd "tmux-terminal-vertical" ; split-it-boy %arg{@} }
 map global window-mode s ":buf-hsplit<ret>" \
     -docstring 'Open current buffer in horizontal split'
 
-define-command buf-tab \
+def buf-tab \
 -override \
 -params .. \
 %{ set buffer split_cmd "tmux-terminal-window" ; split-it-boy %arg{@} }
@@ -184,7 +184,7 @@ map global window-mode q ":q<ret>" \
 #------------------------------------------------------------------------------
 # little helper----------------------------------------------------------------
 
-define-command pipe \
+def pipe \
 -docstring "Pipe shell output into new buffer" \
 -override \
 -shell-completion \
@@ -194,7 +194,7 @@ define-command pipe \
     fifo="$tdir/fifo"
     mkfifo $fifo
     ( $@ > ${fifo} 2>&1 & ) > /dev/null 2>&1 < /dev/null
-    printf %s "e -fifo $fifo *output-buffer*;
+    printf %s "e -fifo $fifo *pipe-output-buffer*;
       hook -always -once buffer BufCloseFifo .* %{ nop %sh{ rm -r $tdir } }"
 } }
 
@@ -284,7 +284,18 @@ exec -draft -itersel '"mZ"oP"mz"cp"mz'
 map global normal <a-'> ':surround-selection<ret>'
 map global normal <a-"> ':surround-selection true<ret>'
 
-define-command find-file \
+def remove-matching-forward \
+-override \
+%{exec -save-regs '^"' 'm;Zm;dzd'}
+
+def remove-matching-backward \
+-override \
+%{exec -save-regs '^"' '<a-m>;Zm;dzd'}
+
+map global normal D ':remove-matching-forward<ret>'
+map global normal <a-D> ':remove-matching-backward<ret>'
+
+def find-file \
 -docstring 'Fuzzy search for the files'\
 -override \
 %{ prompt  -menu  -shell-script-candidates %{
@@ -293,26 +304,26 @@ define-command find-file \
  map global user f ':find-file<ret>' \
     -docstring 'Search for the file'
 
-define-command find-buffer \
+def find-buffer \
 -docstring 'Open an exising buffer' \
 -override \
 %{ prompt -menu -buffer-completion 'Buffer: ' 'buffer %val{text}' }
 map global user b ':find-buffer<ret>' \
     -docstring 'Serch for the active buffers'
 
-define-command ls \
+def ls \
 -docstring 'List files in the current directory' \
 -override \
 %{ info -title "%val{buffile}" %sh{ ls -Alh } }
 map global normal <c-l> ":ls<ret>"
 
-define-command sh \
+def sh \
 -override \
 -file-completion \
 -params 1.. \
 %{ echo -debug %sh{ "$@" } }
 
-define-command close-buffers \
+def close-buffers \
 -override \
 -buffer-completion \
 -params 1 \
@@ -324,14 +335,14 @@ define-command close-buffers \
     printf %s "$cmd" 
 } }
 
-define-command set-filetype \
+def set-filetype \
 -docstring 'Set a filetype for current buffer' \
 -override \
 -params 1 \
 %{ set-option current filetype %arg{1} }
 alias global lang set-filetype
 
-define-command new-file \
+def new-file \
 -docstring 'Create a new file(s)'\
 -override \
 -params 1.. \
@@ -348,14 +359,27 @@ set-option global modelinefmt \
 '%val{bufname} %val{cursor_line}:%val{cursor_char_column} 
 {{context_info}} {{mode_info}} - %val{client}@[%val{session}] - (%opt{current_langmap})'
 
-define-command toggle-langmap \
+def toggle-langmap \
 -override \
 %{ evaluate-commands %sh{
-    current="en"
-    alt="$kak_opt_alt_langmap"  
-    [ "$kak_opt_current_langmap" == "$current" ] && current="$alt"
-    "$kak_opt_glua/langmap.py" "$kak_opt_current_langmap" "$alt"
-    echo "set buffer current_langmap $current"
+    EN="\`~1!2@3#4\$5%6^7&8*9(0)_=+\\|qQwWeErRtTyYuUiIoOpP[{]}aAsSdDfFgGhHjJkKlL;:'\"zZxXcCvVbBnNmM,<.>/?"
+    RU='ёЁ1!2"3№4;5%6:7?8*9(0)_=+\\/йЙцЦуУкКеЕнНгГшШщЩзЗхХъЪфФыЫвВаАпПрРоОлЛдДжЖэЭяЯчЧсСмМиИтТьЬбБюЮ.,'
+    UA="'ʼ1!2\"3№4;5%6:7?8*9(0)_=+ґҐйЙцЦуУкКеЕнНгГшШщЩзЗхХїЇфФіІвВаАпПрРоОлЛдДжЖєЄяЯчЧсСмМиИтТьЬбБюЮ.,"
+
+	NEW_CURRENT="en"
+    DEFAULT_MAP="$EN"
+    ALT_MAP="$UA"
+    [ $kak_opt_alt_langmap == "ru" ] && ALT="$RU" 
+
+    ACTION="unmap"
+    [ "$kak_opt_current_langmap" == "$NEW_CURRENT" ] && NEW_CURRENT="$kak_opt_alt_langmap" && ACTION="map"
+
+    CMD=
+    for ((i=0; i < ${#DEFAULT_MAP}; i++)); do
+        CMD+="${ACTION} global insert %§${DEFAULT_MAP:i:1}§ %§${ALT_MAP:i:1}§; "
+    done
+
+    printf %s "$CMD; set buffer current_langmap $NEW_CURRENT"
 } }
 map global insert '<c-^>' '<a-;>:toggle-langmap<ret>'
 map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
@@ -364,7 +388,7 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 # Autosave
 
 decl -hidden bool auto_save_enabled false
-define-command enable-auto-save -override  %{
+def enable-auto-save -override  %{
     eval %sh{ [ $kak_opt_auto_save_enabled == true ] && printf %s "fail Auto Save already enabled" }
     hook buffer -group auto-save NormalKey '.*' \
         %{ eval %sh{ [ $kak_modified == true ] && printf %s "w"  } }

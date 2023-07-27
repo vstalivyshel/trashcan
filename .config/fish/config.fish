@@ -10,9 +10,7 @@ if status is-interactive
     bind \cl 'ls -Ahls; commandline -f repaint'
     setxkbmap -option "ctrl:nocaps"
 
-    alias up='sudo apt update -y && sudo pat upgrade; rustup update; brew upgrade'
+    alias up='sudo apt update -y && sudo apt upgrade; rustup update'
     alias dfs="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME"
     alias dfsdo='dfs commit -a -m "yea"; dfs push origin main'
-
-    eval (/home/linuxbrew/.linuxbrew/bin/brew shellenv)
 end
