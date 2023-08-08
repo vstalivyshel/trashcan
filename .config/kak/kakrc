@@ -1,4 +1,4 @@
-colorscheme lotus
+colorscheme rose-pine-moon
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 declare-option -hidden str glua "%val{config}/glua"
@@ -66,8 +66,10 @@ map global normal X 'x_'
 map global normal . '<a-.>'
 map global normal <a-.> '.'
 
-map global goto n '<esc>:bn<ret>'
-map global goto p '<esc>:bp<ret>'
+map global goto n '<esc>:bn<ret>' \
+    -docstring 'Goto next buffer'
+map global goto p '<esc>:bp<ret>' \
+    -docstring 'Goto previous buffer'
 
 map global normal '#' ':comment-line<ret>'
 map global user w ":w<ret>" \
@@ -195,7 +197,10 @@ def pipe \
     mkfifo $fifo
     ( $@ > ${fifo} 2>&1 & ) > /dev/null 2>&1 < /dev/null
     printf %s "e -fifo $fifo *pipe-output-buffer*;
-      hook -always -once buffer BufCloseFifo .* %{ nop %sh{ rm -r $tdir } }"
+      hook -always -once buffer BufCloseFifo .* %{
+           nop %sh{ rm -r $tdir } ;
+           eval -client $kak_client %{echo %{Completed '$@'}} ;
+      }"
 } }
 
 def pdf-compile \
@@ -292,17 +297,27 @@ def remove-matching-backward \
 -override \
 %{exec -save-regs '^"' '<a-m>;Zm;dzd'}
 
-map global normal D ':remove-matching-forward<ret>'
-map global normal <a-D> ':remove-matching-backward<ret>'
+map global normal <a-v> ':remove-matching-forward<ret>'
+map global normal <a-V> ':remove-matching-backward<ret>'
 
 def find-file \
--docstring 'Fuzzy search for the files'\
+-docstring 'Fuzzy search for the files from specified directory'\
 -override \
-%{ prompt  -menu  -shell-script-candidates %{
-    find -type f -not -path "*/colors/*" -not -path "*/\.*/*" -not -path "*/target/*"
-} 'File: '  %{ try %{ edit -existing %val{text} } } }
- map global user f ':find-file<ret>' \
-    -docstring 'Search for the file'
+-file-completion \
+-params .. \
+%{ eval %sh{
+    printf %s "
+    prompt  -menu  -shell-script-candidates %{
+        find ${@} -type f -not -path '*/colors/*' -not -path '*/\.*/*' -not -path '*/target/*' 
+    } 'File: '  %{ try %{ edit -existing %val{text} } } "
+} }
+
+map global user t ':find-file "../tests"<ret>'
+map global user f ':find-file<ret>' \
+    -docstring 'Fuzzy search for the files from current directory'\
+
+map global user F ':find-file ../<ret>' \
+    -docstring 'Fuzzy search for the files from parent directory'\
 
 def find-buffer \
 -docstring 'Open an exising buffer' \
@@ -345,6 +360,7 @@ alias global lang set-filetype
 def new-file \
 -docstring 'Create a new file(s)'\
 -override \
+-file-completion \
 -params 1.. \
 %{ echo %sh{ touch "$@" }; edit %arg{1} }
 alias global nf new-file
@@ -388,17 +404,28 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 # Autosave
 
 decl -hidden bool auto_save_enabled false
-def enable-auto-save -override  %{
-    eval %sh{ [ $kak_opt_auto_save_enabled == true ] && printf %s "fail Auto Save already enabled" }
-    hook buffer -group auto-save NormalKey '.*' \
-        %{ eval %sh{ [ $kak_modified == true ] && printf %s "w"  } }
-    set buffer auto_save_enabled true
-}
-def disable-auto-save -override %{
-    eval %sh{ [ $kak_opt_auto_save_enabled == false ] && printf %s "fail Auto Save already disabled" }
-    rmhooks buffer auto-save
-    set buffer auto_save_enabled false
-}
+def enable-auto-save \
+-override \
+-params 1 \
+%{ eval %sh{
+    [ $kak_opt_auto_save_enabled == true ] && printf %s "fail Auto Save already enabled" && exit 1
+    scope="buffer"
+    printf %s "
+    hook $1 -group auto-save NormalKey '.*' \
+        %{ eval %sh{ [ \$kak_modified == true ] && printf %s "w"  } }
+    set $1 auto_save_enabled true
+    "
+} }
+def disable-auto-save \
+-override \
+-params 1 \
+%{ eval %sh{
+    [ $kak_opt_auto_save_enabled == false ] && printf %s "fail Auto Save already disabled" && exit 1
+    printf %s "
+    rmhooks $1 auto-save
+    set $1 auto_save_enabled false
+    "
+} }
 
 #------------------------------------------------------------------------------
 #fmt --------------------------------------------------------------------------
@@ -436,3 +463,4 @@ set global lsp_hover_anchor true
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 source "%val{config}/find.kak"
+source "%val{config}/cargo.kak"

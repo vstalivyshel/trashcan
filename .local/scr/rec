@@ -1,0 +1,39 @@
+#!/bin/env bash
+
+set -ex
+OPT="$1"
+# -----------------------------------------------
+FRAMERATE=25
+# -----------------------------------------------
+RESULUTION=$($(which xrandr) | grep -Po "(\d+x\d+)(?=.*\*)")
+NAME="$(date +%y%m%d-%T)"
+OUT_ROOT="/home/vstalivyshel/Records"
+VID_OUT="$OUT_ROOT/$NAME.vid.mkv"
+AUD_OUT="$OUT_ROOT/$NAME.aud.mkv"
+# -----------------------------------------------
+mkdir -p "$OUT_ROOT"
+# -----------------------------------------------
+record_vid_aud() {
+    ffmpeg \
+    -hide_banner \
+    -f x11grab -r "$FRAMERATE" -s "$RESULUTION" -i "$DISPLAY" \
+    -f alsa -ac 1 -i sysdefault:CARD=Device \
+    -preset slow  -c:v libx264 -crf 23 -c:a copy \
+    "$VID_OUT"
+}
+
+record_aud() {
+    ffmpeg \
+    -hide_banner \
+    -f alsa -ac 1 -i sysdefault:CARD=Device \
+    "$VID_OUT"
+}
+
+
+if [ $OPT == "aud" ]; then
+    record_aud
+elif [ $OPT == "vid" ]; then
+    record_vid_aud
+else
+    echo "Wrong option"
+fi

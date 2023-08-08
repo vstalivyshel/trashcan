@@ -23,7 +23,7 @@ if [[ "$EDITOR" == *"kak"* ]]; then
         sleep 0.05
     fi
 
-    kak -c "$session_name"
+    kak -e 'try %{cd src/}' -c "$session_name"
 else
     "$EDITOR"
 fi

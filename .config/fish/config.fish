@@ -10,7 +10,8 @@ if status is-interactive
     bind \cl 'ls -Ahls; commandline -f repaint'
     setxkbmap -option "ctrl:nocaps"
 
-    alias up='sudo apt update -y && sudo apt upgrade; rustup update'
+    alias up='sudo apt update -y && sudo apt upgrade -y; rustup update'
     alias dfs="/usr/bin/git --git-dir=$HOME/.dots/ --work-tree=$HOME"
     alias dfsdo='dfs commit -a -m "yea"; dfs push origin main'
+    alias feh='feh --keep-zoom-vp'
 end
