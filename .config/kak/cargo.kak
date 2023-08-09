@@ -189,5 +189,3 @@ define-command cargo-previous-error -docstring 'Jump to the previous cargo error
     	fail "No Cargo errors found"
     }
 }
-
-declare-user-mode cargo

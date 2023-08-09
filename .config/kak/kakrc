@@ -1,4 +1,4 @@
-colorscheme rose-pine-moon
+colorscheme lotus
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 declare-option -hidden str glua "%val{config}/glua"
@@ -77,10 +77,6 @@ map global user w ":w<ret>" \
 
 map global user y '<a-|>xsel --input --clipboard<ret>'\
     -docstring 'Yank into system Clipboard'
-map global user P '!xsel --output --clipboard<ret>'\
-    -docstring 'Paste after a seletction from the system clipboard'
-map global user p '<a-!>xsel --output --clipboard<ret>'\
-    -docstring 'Paste before a seletction from the system clipboard'
 
 evaluate-commands %sh{
     keys='h j k l H J K L '
@@ -96,6 +92,12 @@ evaluate-commands %sh{
 	done
 	printf %s "eval %{ $cmd }"
 }
+
+map global normal / <c-s>/
+map global normal ? <c-s>?
+map global normal <a-/> <c-s><a-/>
+map global normal <a-?> <c-s><a-?>
+map global normal * <c-s>*
 
 #------------------------------------------------------------------------------
 # colors ----------------------------------------------------------------------
@@ -133,20 +135,22 @@ If no text is passed, then the selection is used" \
 eval %sh{ [ $# -eq 0 ] && printf "%s\n" "repl-send-text" || printf "%s %s\n" "repl-send-text %{$1}" }
 nop %sh{ tmux send -t $kak_opt_tmux_repl_id "" C-m }
 }
-map global user R ':repl-eval-text<ret>'
+map global user R ':repl-eval-text<ret>' \
+    -docstring 'Send selected text as command to repl'
 
 def repl-send-prompt \
 -override \
 -params ..1 \
 %{ prompt 'repl-cmd ' %{ repl-eval-text %val{text}} }
-map global user r ':repl-send-prompt<ret>'
-
+map global user r ':repl-send-prompt<ret>' \
+	-docstring 'Prompt for command to send to repl'
 
 def repl-eval-last-command \
 -override \
 -docstring "repl-eval-last-command: Re-run the last executed command at the REPL" \
  %{ nop %sh{tmux send -t $kak_opt_tmux_repl_id "Up" C-m} }
- map global user <a-r> ':repl-eval-last-command<ret>'
+ map global user <a-r> ':repl-eval-last-command<ret>' \
+ 	-docstring 'Repeat last sent command to repl'
 
 # ------------------------------------------------------------------------------
 # splits ----------------------------------------------------------------------
@@ -242,7 +246,7 @@ def eval-selected-all \
      done
 } }
 map global user ':' ':eval-selected-all<ret>' \
-    -docstring 'Eval selected text'
+    -docstring 'Eval selected text for all sessions'
 
 def swap-selections \
 -override \
@@ -311,13 +315,12 @@ def find-file \
         find ${@} -type f -not -path '*/colors/*' -not -path '*/\.*/*' -not -path '*/target/*' 
     } 'File: '  %{ try %{ edit -existing %val{text} } } "
 } }
-
-map global user t ':find-file "../tests"<ret>'
+map global user t ':find-file "../tests"<ret>' \
+    -docstring 'Try to fuzzy search for the files in "../tests"'
 map global user f ':find-file<ret>' \
-    -docstring 'Fuzzy search for the files from current directory'\
-
+    -docstring 'Fuzzy search for the files from current directory'
 map global user F ':find-file ../<ret>' \
-    -docstring 'Fuzzy search for the files from parent directory'\
+    -docstring 'Fuzzy search for the files from parent directory'
 
 def find-buffer \
 -docstring 'Open an exising buffer' \
@@ -339,16 +342,23 @@ def sh \
 %{ echo -debug %sh{ "$@" } }
 
 def close-buffers \
+-docstring 'The current and the *debug* buffers will be ignored' \
 -override \
 -buffer-completion \
 -params 1 \
 %{ eval %sh{
     cmd=
     for b in $kak_buflist; do
-    	[[ "$b" =~ $1 ]] && cmd+="db '$b'; " 
+        [[ "$b" == "$kak_bufname" ]] && continue
+        [[ "$b" == "*debug*" ]] && continue
+        [[ "$b" =~ $1 ]] && cmd+="db '$b'; " 
     done
     printf %s "$cmd" 
 } }
+
+def cb-all-not-current \
+-override \
+%{ close-buffers "^(?!.*%val{bufname})*." }
 
 def set-filetype \
 -docstring 'Set a filetype for current buffer' \
@@ -463,4 +473,18 @@ set global lsp_hover_anchor true
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 source "%val{config}/find.kak"
+
 source "%val{config}/cargo.kak"
+declare-user-mode cargo
+
+map global user n ':cargo-next-error<ret>' \
+	-docstring 'Next "cargo" error/warning'
+map global user p ':cargo-previous-error<ret>' \
+	-docstring 'Previous "cargo" error/warning'
+
+map global user c ':enter-user-mode cargo<ret>' \
+	-docstring 'Cargo mode'
+map global cargo t ':cargo test<ret>' \
+	-docstring 'Run tests'
+map global cargo c ':cargo clippy<ret>' \
+	-docstring 'Run diagnostics'
