@@ -1,4 +1,4 @@
-colorscheme lotus
+colorscheme kanagawa
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 declare-option -hidden str glua "%val{config}/glua"
@@ -32,7 +32,7 @@ hook global WinSetOption filetype=yaml %{
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
-map global insert <c-w> '<a-;>h<a-;>b<a-;>"_d'
+map global insert <c-w> '<a-;>b<a-;>"_d'
 map global insert <c-h> <backspace>
 map global insert <c-b> '<left>'
 map global insert <c-f> '<right>'
@@ -45,19 +45,24 @@ map global insert <c-d> '<a-;>;<a-;>"_d'
 map global normal X 'x_'
 map global normal . '<a-.>'
 map global normal <a-.> '.'
+map global normal '#' ':comment-line<ret>'
+# save selections before jumping somewhere:
+map global normal / <c-s>/
+map global normal ? <c-s>?
+map global normal <a-/> <c-s><a-/>
+map global normal <a-?> <c-s><a-?>
+map global normal * <c-s>*
 
 map global goto n '<esc>:bn<ret>' \
     -docstring 'Goto next buffer'
 map global goto p '<esc>:bp<ret>' \
     -docstring 'Goto previous buffer'
-
-map global normal '#' ':comment-line<ret>'
 map global user w ":w<ret>" \
     -docstring 'Save'
-
 map global user y '<a-|>xsel --input --clipboard<ret>'\
     -docstring 'Yank into system Clipboard'
 
+# alt + <anyaction> to escape insert mode
 evaluate-commands %sh{
     keys='h j k l H J K L '
     keys+='o I O A ' 
@@ -73,25 +78,19 @@ evaluate-commands %sh{
 	printf %s "eval %{ $cmd }"
 }
 
-map global normal / <c-s>/
-map global normal ? <c-s>?
-map global normal <a-/> <c-s><a-/>
-map global normal <a-?> <c-s><a-?>
-map global normal * <c-s>*
-
 #------------------------------------------------------------------------------
-# colors ----------------------------------------------------------------------
+# themes ----------------------------------------------------------------------
 
-def make-color-current-file -override -command-completion %{
+def make-theme-current-file -override -command-completion %{
 eval %sh{
     file="$kak_opt_filetype"
     if [ $file != "lua" ]; then
-        printf %s "fail you are not in a lua color file!"
+        printf %s "fail you are not in a lua theme file!"
     else
-        "$kak_opt_glua/make_color.lua" "$kak_buffile" "$kak_config/colors"
+        "$kak_config/maketheme" "$kak_buffile" "$kak_config/colors"
     fi 
 } }
-map global user M ':make-color-current-file<ret>' \
+map global user M ':make-theme-current-file<ret>' \
     -docstring 'Generate colorscheme from current lua specs'
 
 # ------------------------------------------------------------------------------

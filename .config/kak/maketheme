@@ -1,4 +1,4 @@
-#!/bin/env lua
+#!/usr/bin/env lua
 
 local io = io
 local os = os
@@ -32,13 +32,8 @@ local function dbg(msg, ...)
 	end
 end
 
--- local function file_exists(file)
---    local ok, err, code = os.rename(file, file)
---    return ok and true or code == 13 and true  or false, err
--- end
-
 local template = [[
--- { <fg>, [bg], [attr] } or just <fg>
+-- { <fg>, [bg], [attr] } 
 -- Color: "#RRGGBB" or 'MenuInfo = "Default"', exception: func = "function"
 -- Attribute: "+..."
 --- Palette ---
@@ -144,7 +139,7 @@ colors = colors()
 
 local color_name = colors.Colorscheme_name
 if not color_name or color_name == "" then
-	panic("not colorscheme name supplied")
+	panic("colorscheme name was not supplied!")
 end
 colors.Colorscheme_name = nil
 
