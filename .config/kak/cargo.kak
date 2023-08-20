@@ -43,8 +43,8 @@ add-highlighter shared/cargo/items/finished/flags/flags/flag regex '[a-zA-Z0-9_\
 add-highlighter shared/cargo/items/finished/seconds regex "in ([0-9]+\.[0-9]+)s" 1:default+b
 
 # test result
-add-highlighter shared/cargo/ok_test regex "ok$" 0:green+b
-add-highlighter shared/cargo/failed_test regex "FAILED" 0:red+b
+add-highlighter shared/cargo/ok_test regex "\bok\b" 0:green+b
+add-highlighter shared/cargo/failed_test regex "\bFAILED\b" 0:red+b
 
 # global highlighters
 add-highlighter shared/cargo/error regex "^(error):" 1:red+b
@@ -70,7 +70,7 @@ declare-option -hidden str cargo_workspace_root
 define-command -params .. \
 -docstring %{cargo [<arguments>]: cargo utility wrapper
 All the optional arguments are forwarded to the cargo utility} \
--shell-script-candidates %{ printf "test\ncheck\nbuild\nrun" } \
+-shell-script-candidates %{ printf "test\ncheck\nbuild\nrun\nclippy" } \
 cargo %{
     evaluate-commands %sh{
         workspace_root=$(

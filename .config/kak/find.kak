@@ -43,7 +43,7 @@ If <pattern> is not specified, the content of the main selection is used
         edit -scratch *find*
         exec R
         set buffer find_current_line 0
-        addhl buffer/ regex "%reg{/}" 0:black,yellow
+        addhl buffer/ regex "%reg{/}" 0:bright-white,blue
         # final so that %reg{/} doesn't get highlighted in the header
         addhl buffer/ regex "^([^\n]+):(\d+):(\d+):" 1:cyan,default+F 2:green,default+F 3:green,default+F
         addhl buffer/ line '%opt{find_current_line}' default+b
