@@ -1,4 +1,4 @@
-colorscheme kanagawa
+colorscheme rose-pine-moon
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 declare-option -hidden str glua "%val{config}/glua"
@@ -168,6 +168,27 @@ map global window-mode q ":q<ret>" \
 
 #------------------------------------------------------------------------------
 # little helper----------------------------------------------------------------
+decl -hidden bool auto_save_enabled false
+def toggle-auto-save \
+-override \
+%{ eval %sh{
+    cmd=
+    enabled=
+    if [ $kak_opt_auto_save_enabled == true ]; then
+    	cmd="rmhooks global auto-save"
+    	enabled=false
+    else
+        cmd="hook global -group auto-save NormalKey '.*' \
+            %{ eval %sh{ [ \$kak_modified == true ] && printf %s 'w'  } } "
+        enabled=true
+    fi
+    printf %s "
+    $cmd
+    set global auto_save_enabled $enabled
+    echo AUTO-SAVE=$enabled"
+} }
+# Enable auto-save on startup
+toggle-auto-save
 
 decl bool expand_tab_enabled false
 def toggle-expand-tab \
@@ -355,10 +376,6 @@ def close-buffers \
     printf %s "$cmd" 
 } }
 
-def cb-all-not-current \
--override \
-%{ close-buffers "^(?!.*%val{bufname})*." }
-
 def set-filetype \
 -docstring 'Set a filetype for current buffer' \
 -override \
@@ -388,7 +405,9 @@ declare-option str current_langmap 'en'
 
 set-option global modelinefmt \
 '%val{bufname} %val{cursor_line}:%val{cursor_char_column} 
-{{context_info}} {{mode_info}} - %val{client}@[%val{session}] - (%opt{current_langmap})'
+{{context_info}} {{mode_info}} - %val{client}@[%val{session}]
+- AS:%opt{auto_save_enabled}
+- (%opt{current_langmap})'
 
 def toggle-langmap \
 -override \
@@ -418,39 +437,19 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 #------------------------------------------------------------------------------
 # Autosave
 
-decl -hidden bool auto_save_enabled false
-def toggle-auto-save \
--override \
-%{ eval %sh{
-    cmd=
-    enabled=
-    if [ $kak_opt_auto_save_enabled == true ]; then
-    	cmd="rmhooks global auto-save"
-    	enabled=false
-    else
-        cmd="hook global -group auto-save NormalKey '.*' \
-            %{ eval %sh{ [ \$kak_modified == true ] && printf %s 'w'  } } "
-        enabled=true
-    fi
-    printf %s "
-    $cmd
-    set global auto_save_enabled $enabled
-    echo AUTO-SAVE=$enabled"
-} }
-
 #------------------------------------------------------------------------------
 # LSP -------------------------------------------------------------------------
 
-eval %sh{kak-lsp --kakoune -s $kak_session}
-map global user l %{:enter-user-mode lsp<ret>} -docstring "LSP mode"
-map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>' -docstring 'Select next snippet placeholder'
-map global object e '<a-semicolon>lsp-object Function Method<ret>' -docstring 'LSP function or method'
-map global object k '<a-semicolon>lsp-object Class Interface Struct<ret>' -docstring 'LSP class interface or struct'
-map global object d '<a-semicolon>lsp-diagnostic-object --include-warnings<ret>' -docstring 'LSP errors and warnings'
-map global object D '<a-semicolon>lsp-diagnostic-object<ret>' -docstring 'LSP errors'
+# eval %sh{kak-lsp --kakoune -s $kak_session}
+# map global user l %{:enter-user-mode lsp<ret>} -docstring "LSP mode"
+# map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>' -docstring 'Select next snippet placeholder'
+# map global object e '<a-semicolon>lsp-object Function Method<ret>' -docstring 'LSP function or method'
+# map global object k '<a-semicolon>lsp-object Class Interface Struct<ret>' -docstring 'LSP class interface or struct'
+# map global object d '<a-semicolon>lsp-diagnostic-object --include-warnings<ret>' -docstring 'LSP errors and warnings'
+# map global object D '<a-semicolon>lsp-diagnostic-object<ret>' -docstring 'LSP errors'
 
-lsp-inlay-diagnostics-enable global
-set global lsp_hover_anchor true
+# lsp-inlay-diagnostics-enable global
+# set global lsp_hover_anchor true
 
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------

@@ -6,7 +6,7 @@ if status is-interactive
     set -Ux EDITOR kak
     set -Ux VISUAL $EDITOR
 
-    bind \cv $EDITOR
+    bind \cv 'goto'
     bind \cl 'ls -Ahls; commandline -f repaint'
     setxkbmap -option "ctrl:nocaps"
 
