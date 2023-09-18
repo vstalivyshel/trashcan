@@ -23,8 +23,13 @@ hook global -group insert-color ModeChange .*:insert:.* %{ try %{
     unset-face window PrimaryCursorEol 
 } }
 
-# yaml-filetype 
-hook global WinSetOption filetype=yaml %{
+hook global WinSetOption filetype=(yaml|json) %{
+    set buffer tabstop 2
+    set buffer indentwidth 2
+}
+
+hook global WinSetOption filetype=(markdown) %{
+    rmhooks window markdown-trim-indent
     set buffer tabstop 2
     set buffer indentwidth 2
 }
@@ -327,17 +332,22 @@ map global normal <a-V> ':remove-matching-backward<ret>'
 def find-file \
 -docstring 'Fuzzy search for the files from specified directory'\
 -override \
--file-completion \
--params .. \
-%{ eval %sh{
-    printf %s "
-    prompt  -menu  -shell-script-candidates %{
-        find ${@} -type f -not -path '*/colors/*' -not -path '*/\.*/*' -not -path '*/target/*' 
-    } 'File: '  %{ try %{ edit -existing %val{text} } } "
-} }
-map global user t ':find-file "../tests"<ret>' \
+-params 1 \
+%{ eval %sh{printf %s "
+    prompt -menu  -shell-script-candidates %{
+        find $@ -type f \
+            -not -path '*/node_modules/*' \
+            -not -path '*/colors/*' \
+            -not -path '*/\.*/*' \
+            -not -path '*/target/*'
+    }  'File: ' %{
+        edit -existing %val{text} 
+    }"
+} } 
+
+map global user t ':find-file "../test*"<ret>' \
     -docstring 'Try to fuzzy search for the files in "../tests"'
-map global user f ':find-file<ret>' \
+map global user f ':find-file .<ret>' \
     -docstring 'Fuzzy search for the files from current directory'
 map global user F ':find-file ../<ret>' \
     -docstring 'Fuzzy search for the files from parent directory'
@@ -440,16 +450,16 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 #------------------------------------------------------------------------------
 # LSP -------------------------------------------------------------------------
 
-# eval %sh{kak-lsp --kakoune -s $kak_session}
-# map global user l %{:enter-user-mode lsp<ret>} -docstring "LSP mode"
-# map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>' -docstring 'Select next snippet placeholder'
-# map global object e '<a-semicolon>lsp-object Function Method<ret>' -docstring 'LSP function or method'
-# map global object k '<a-semicolon>lsp-object Class Interface Struct<ret>' -docstring 'LSP class interface or struct'
-# map global object d '<a-semicolon>lsp-diagnostic-object --include-warnings<ret>' -docstring 'LSP errors and warnings'
-# map global object D '<a-semicolon>lsp-diagnostic-object<ret>' -docstring 'LSP errors'
+eval %sh{kak-lsp --kakoune -s $kak_session}
+map global user l %{:enter-user-mode lsp<ret>} -docstring "LSP mode"
+map global insert <tab> '<a-;>:try lsp-snippets-select-next-placeholders catch %{ execute-keys -with-hooks <lt>tab> }<ret>' -docstring 'Select next snippet placeholder'
+map global object e '<a-semicolon>lsp-object Function Method<ret>' -docstring 'LSP function or method'
+map global object k '<a-semicolon>lsp-object Class Interface Struct<ret>' -docstring 'LSP class interface or struct'
+map global object d '<a-semicolon>lsp-diagnostic-object --include-warnings<ret>' -docstring 'LSP errors and warnings'
+map global object D '<a-semicolon>lsp-diagnostic-object<ret>' -docstring 'LSP errors'
 
-# lsp-inlay-diagnostics-enable global
-# set global lsp_hover_anchor true
+lsp-inlay-diagnostics-enable global
+set global lsp_hover_anchor true
 
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
@@ -477,7 +487,7 @@ map global user c ':enter-user-mode cargo<ret>' \
 	-docstring 'Cargo mode'
 map global cargo t ':cargo test<ret>' \
 	-docstring 'Run tests'
-map global cargo c ':cargo clippy<ret>' \
+map global cargo c ':cargo clippy --all-targets<ret>' \
 	-docstring 'Run diagnostics'
 map global cargo b ':b *cargo*<ret>' \
 	-docstring 'Open cargo buffer'

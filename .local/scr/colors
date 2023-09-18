@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 
 themes=( "gruv-light" "rose-pine-moon" "rose-pine-dawn" "rose-pine" "kanagawa" "lotus")
 
