@@ -4,11 +4,6 @@ dirs="$HOME/.local/scr "
 dirs+="$HOME/.config "
 dirs+="$HOME/Downloads "
 dirs+="$HOME/HoneyBunny "
-dirs+="$HOME/HoneyBunny/rust "
-dirs+="$HOME/HoneyBunny/javascript "
-dirs+="$HOME/HoneyBunny/ruby "
-dirs+="$HOME/HoneyBunny/pascudstvo "
-dirs+="$HOME/HoneyBunny/glsl "
 
 spawn_editor() {
     if [ "$EDITOR" == "kak" ] && command -v kak > /dev/null; then
