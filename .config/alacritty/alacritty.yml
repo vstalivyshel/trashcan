@@ -1,5 +1,5 @@
 import:
- - /home/vstalivyshel/.config/alacritty/rose-pine-moon.yml
+ - /home/vstalivyshel/.config/alacritty/lotus.yml
 
 # Any items in the `env` entry below will be added as
 # environment variables. Some entries may override variables

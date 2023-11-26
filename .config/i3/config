@@ -192,7 +192,7 @@ bar {
 }
 
 bindsym $mod+Shift+Home exec systemctl reboot
-bindsym $mod+Shift+End exec systemctl poweroff -i
+bindsym $mod+Shift+End exec systemctl poweroff
 
 focus_follows_mouse no
 hide_edge_borders smart
