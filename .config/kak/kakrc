@@ -173,6 +173,8 @@ map global window-mode q ":q<ret>" \
 
 #------------------------------------------------------------------------------
 # little helper----------------------------------------------------------------
+alias global d delete-buffer
+
 decl -hidden bool auto_save_enabled false
 def toggle-auto-save \
 -override \
