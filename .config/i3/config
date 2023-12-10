@@ -199,7 +199,6 @@ focus_follows_mouse no
 hide_edge_borders smart
 
 for_window [class="^.*"] border pixel 3
-for_window [class="tuto"] floating enable 
 
 exec --no-startup-id firefox
 exec --no-startup-id workspace 2; $term -e tmux

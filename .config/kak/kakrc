@@ -1,4 +1,4 @@
-colorscheme lotus
+colorscheme rose-pine-moon
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 declare-option -hidden str glua "%val{config}/glua"
@@ -34,6 +34,10 @@ hook global WinSetOption filetype=(markdown) %{
     set buffer indentwidth 2
 }
 
+hook global BufOpenFile .*\.wgsl %{
+    set buffer filetype rust
+}
+
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
@@ -58,10 +62,10 @@ map global normal <a-/> <c-s><a-/>
 map global normal <a-?> <c-s><a-?>
 map global normal * <c-s>*
 
-map global goto n '<esc>:bn<ret>' \
-    -docstring 'Goto next buffer'
-map global goto p '<esc>:bp<ret>' \
-    -docstring 'Goto previous buffer'
+map global goto n '<esc>:grep-next-match<ret>' \
+    -docstring 'Goto next grep match'
+map global goto p '<esc>:grep-previous-match<ret>' \
+    -docstring 'Goto previous grep match'
 map global user w ":w<ret>" \
     -docstring 'Save'
 map global user y '<a-|>xsel --input --clipboard<ret>'\
@@ -322,11 +326,11 @@ map global normal <a-"> ':surround-selection true<ret>'
 
 def remove-matching-forward \
 -override \
-%{exec -save-regs '^"' 'm;Zm;dzd'}
+%{exec -save-regs '^"' 'mm;Zm;dzd'}
 
 def remove-matching-backward \
 -override \
-%{exec -save-regs '^"' '<a-m>;Zm;dzd'}
+%{exec -save-regs '^"' '<a-m><a-m>;Zm;dzd'}
 
 map global normal <a-v> ':remove-matching-forward<ret>'
 map global normal <a-V> ':remove-matching-backward<ret>'
@@ -413,7 +417,7 @@ alias global nf new-file
 # langmap ---------------------------------------------------------------------
 
 declare-option str alt_langmap 'ua'
-declare-option str current_langmap 'en'
+declare-option -hidden str current_langmap 'en'
 
 set-option global modelinefmt \
 '%val{bufname} %val{cursor_line}:%val{cursor_char_column} 
@@ -425,13 +429,13 @@ def toggle-langmap \
 -override \
 %{ evaluate-commands %sh{
     EN="\`~1!2@3#4\$5%6^7&8*9(0)_=+\\|qQwWeErRtTyYuUiIoOpP[{]}aAsSdDfFgGhHjJkKlL;:'\"zZxXcCvVbBnNmM,<.>/?"
-    RU='ёЁ1!2"3№4;5%6:7?8*9(0)_=+\\/йЙцЦуУкКеЕнНгГшШщЩзЗхХъЪфФыЫвВаАпПрРоОлЛдДжЖэЭяЯчЧсСмМиИтТьЬбБюЮ.,'
+    RU="ёЁ1!2\"3№4;5%6:7?8*9(0)_=+\\|йЙцЦуУкКеЕнНгГшШщЩзЗхХъЪфФыЫвВаАпПрРоОлЛдДжЖэЭяЯчЧсСмМиИтТьЬбБюЮ.,"
     UA="'ʼ1!2\"3№4;5%6:7?8*9(0)_=+ґҐйЙцЦуУкКеЕнНгГшШщЩзЗхХїЇфФіІвВаАпПрРоОлЛдДжЖєЄяЯчЧсСмМиИтТьЬбБюЮ.,"
 
 	NEW_CURRENT="en"
     DEFAULT_MAP="$EN"
     ALT_MAP="$UA"
-    [ $kak_opt_alt_langmap == "ru" ] && ALT="$RU" 
+    [ $kak_opt_alt_langmap == "ru" ] && ALT_MAP="$RU" 
 
     ACTION="unmap"
     [ "$kak_opt_current_langmap" == "$NEW_CURRENT" ] && NEW_CURRENT="$kak_opt_alt_langmap" && ACTION="map"
