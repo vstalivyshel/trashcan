@@ -4,11 +4,12 @@ dirs="$HOME/.local/scr "
 dirs+="$HOME/.config "
 dirs+="$HOME/Downloads "
 dirs+="$HOME/HoneyBunny "
-dirs+="$HOME/Nya "
+dirs+="$HOME/Zapiski "
+dirs+="$HOME/Malunki "
 
 spawn_editor() {
     if [ "$EDITOR" == "kak" ] && command -v kak > /dev/null; then
-        local session_name=$(basename "$1" | tr ".[:space:]" "_")
+        local session_name=$(basename "$1" | tr -d ".[:space:]")
         local socket_name=$(kak -l | grep -w "$session_name")
 
         if [ -z "$socket_name" ]; then

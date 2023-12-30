@@ -1,8 +1,11 @@
-colorscheme rose-pine-moon
+colorscheme lotus
+#------------------------------------------------------------------------------
+# Plugins ---------------------------------------------------------------------
+source "%val{config}/cargo.kak"
+source "%val{config}/find.kak"
+source "%val{config}/live-grep.kak"
 #------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
-declare-option -hidden str glua "%val{config}/glua"
-
 add-highlighter -override global/paren regex (\(|\)|\{|\}|\[|\]|<|>) 1:operator
 add-highlighter -override global/ number-lines -relative -hlcursor -separator ' '
 add-highlighter -override global/ show-matching 
@@ -13,7 +16,8 @@ set global startup_info_version 999999999
 set global autocomplete prompt
 set global autoinfo 'command'
 set global autoreload true
-
+#------------------------------------------------------------------------------
+# Cursor color  ---------------------------------------------------------------
 hook global -group insert-color ModeChange .*:.*:insert %{
     set-face window PrimaryCursor InsertCursor
     set-face window PrimaryCursorEol InsertCursor
@@ -22,25 +26,25 @@ hook global -group insert-color ModeChange .*:insert:.* %{ try %{
     unset-face window PrimaryCursor
     unset-face window PrimaryCursorEol 
 } }
-
-hook global WinSetOption filetype=(yaml|json) %{
+#------------------------------------------------------------------------------
+# Filetypes -------------------------------------------------------------------
+hook global WinSetOption filetype=(yaml|json|markdown) %{
+    rmhooks window markdown-trim-indent 
     set buffer tabstop 2
     set buffer indentwidth 2
 }
-
-hook global WinSetOption filetype=(markdown) %{
-    rmhooks window markdown-trim-indent
-    set buffer tabstop 2
-    set buffer indentwidth 2
-}
-
 hook global BufOpenFile .*\.wgsl %{
     set buffer filetype rust
 }
-
+hook global BufSetOption filetype=grep %{
+    set buffer auto_save_enabled false
+    map buffer user W ':find-apply-changes -force<ret>' 
+}
+hook global BufCreate git %{
+    set buffer auto_save_enabled false
+}
 #------------------------------------------------------------------------------
-#------------------------------------------------------------------------------
-
+# Maps ------------------------------------------------------------------------
 map global insert <c-w> '<a-;>b<a-;>"_d'
 map global insert <c-h> <backspace>
 map global insert <c-b> '<left>'
@@ -86,10 +90,8 @@ evaluate-commands %sh{
 	done
 	printf %s "eval %{ $cmd }"
 }
-
 #------------------------------------------------------------------------------
 # themes ----------------------------------------------------------------------
-
 def make-theme-current-file -override -command-completion %{
 eval %sh{
     file="$kak_opt_filetype"
@@ -101,10 +103,8 @@ eval %sh{
 } }
 map global user M ':make-theme-current-file<ret>' \
     -docstring 'Generate colorscheme from current lua specs'
-
 # ------------------------------------------------------------------------------
 # repl -------------------------------------------------------------------------
-
 declare-user-mode window-mode
 map global normal <c-w> ":enter-user-mode window-mode<ret>"
 
@@ -139,7 +139,6 @@ def repl-eval-last-command \
  %{ nop %sh{tmux send -t $kak_opt_tmux_repl_id "Up" C-m} }
  map global user <a-r> ':repl-eval-last-command<ret>' \
  	-docstring 'Repeat last sent command to repl'
-
 # ------------------------------------------------------------------------------
 # splits ----------------------------------------------------------------------
 
@@ -174,52 +173,35 @@ map global window-mode t ":buf-tab<ret>" \
 
 map global window-mode q ":q<ret>" \
 	-docstring 'Close current window'
-
 #------------------------------------------------------------------------------
 # little helper----------------------------------------------------------------
 alias global d delete-buffer
 
-decl -hidden bool auto_save_enabled false
-def toggle-auto-save \
--override \
-%{ eval %sh{
-    cmd=
-    enabled=
-    if [ $kak_opt_auto_save_enabled == true ]; then
-    	cmd="rmhooks global auto-save"
-    	enabled=false
-    else
-        cmd="hook global -group auto-save NormalKey '.*' \
-            %{ eval %sh{ [ \$kak_modified == true ] && printf %s 'w'  } } "
-        enabled=true
-    fi
-    printf %s "
-    $cmd
-    set global auto_save_enabled $enabled
-    echo AUTO-SAVE=$enabled"
-} }
-# Enable auto-save on startup
-toggle-auto-save
+# Auto-save
+decl bool auto_save_enabled true
+hook global -group auto-save-manager BufSetOption auto_save_enabled=true %{
+    hook -group auto-save buffer NormalKey '.*' %{
+        eval %sh{ [ $kak_modified == true ] && printf %s 'w'  }
+    }
+}
+hook global -once -group auto-save-manager BufSetOption auto_save_enabled=false %{
+    hook -group auto-save buffer NormalKey '.*' %{
+        rmhooks buffer auto-save
+    }
+}
 
-decl bool expand_tab_enabled false
-def toggle-expand-tab \
--override \
-%{ eval %sh{
-    cmd=
-    enabled=
-    if [ $kak_opt_expand_tab_enabled == true ]; then
-    	cmd="rmhooks global expand-tab"
-    	enabled=false
-	else
-		cmd="hook global -group expand-tab InsertKey <tab> %{ exec -draft h@ }"
-		enabled=true
-    fi
-    printf %s "$cmd
-    set global expand_tab_enabled $enabled
-    echo EXPAND-TAB=$enabled"
-} }
-# Enable expand-tab on startup
-toggle-expand-tab
+# Expand-tab
+decl bool expand_tab_enabled true
+hook global -group expand-tab-manager BufSetOption expand_tab_enabled=true %{
+    hook -group expand-tab buffer NormalKey '.*' %{
+		hook buffer -group expand-tab InsertKey <tab> %{ exec -draft h@ }
+    }
+}
+hook global -once -group expand-tab-manager BufSetOption expand_tab_enabled=false %{
+    hook -group expand-tab buffer NormalKey '.*' %{
+        rmhooks buffer expand-tab
+    }
+}
 
 def pipe \
 -docstring "Pipe shell output into new buffer" \
@@ -412,10 +394,8 @@ def new-file \
     printf %s "edit -existing $file"
 } }
 alias global nf new-file
-
 #------------------------------------------------------------------------------
 # langmap ---------------------------------------------------------------------
-
 declare-option str alt_langmap 'ua'
 declare-option -hidden str current_langmap 'en'
 
@@ -423,6 +403,7 @@ set-option global modelinefmt \
 '%val{bufname} %val{cursor_line}:%val{cursor_char_column} 
 {{context_info}} {{mode_info}} - %val{client}@[%val{session}]
 - AS:%opt{auto_save_enabled}
+- ET:%opt{expand_tab_enabled}
 - (%opt{current_langmap})'
 
 def toggle-langmap \
@@ -449,10 +430,25 @@ def toggle-langmap \
 } }
 map global insert '<c-^>' '<a-;>:toggle-langmap<ret>'
 map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
-
 #------------------------------------------------------------------------------
-# Autosave
+# Cargo -----------------------------------------------------------------------
+declare-user-mode cargo
 
+map global user n ':cargo-next-error<ret>' \
+	-docstring 'Next "cargo" error/warning'
+map global user p ':cargo-previous-error<ret>' \
+	-docstring 'Previous "cargo" error/warning'
+map global user c ':enter-user-mode cargo<ret>' \
+	-docstring 'Cargo mode'
+
+map global cargo t ':cargo test<ret>' \
+	-docstring 'Run tests'
+map global cargo c ':cargo clippy --all-targets<ret>' \
+	-docstring 'Run diagnostics'
+map global cargo b ':b *cargo*<ret>' \
+	-docstring 'Open cargo buffer'
+map global cargo f ':sh cargo fmt<ret>' \
+    -docstring 'Format cargo project'
 #------------------------------------------------------------------------------
 # LSP -------------------------------------------------------------------------
 
@@ -466,34 +462,3 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 
 # lsp-inlay-diagnostics-enable global
 # set global lsp_hover_anchor true
-
-#------------------------------------------------------------------------------
-#------------------------------------------------------------------------------
-
-source "%val{config}/find.kak"
-
-#------------------------------------------------------------------------------
-#------------------------------------------------------------------------------
-
-source "%val{config}/live-grep.kak"
-alias global gr live-grep
-
-#------------------------------------------------------------------------------
-#------------------------------------------------------------------------------
-
-source "%val{config}/cargo.kak"
-declare-user-mode cargo
-
-map global user n ':cargo-next-error<ret>' \
-	-docstring 'Next "cargo" error/warning'
-map global user p ':cargo-previous-error<ret>' \
-	-docstring 'Previous "cargo" error/warning'
-
-map global user c ':enter-user-mode cargo<ret>' \
-	-docstring 'Cargo mode'
-map global cargo t ':cargo test<ret>' \
-	-docstring 'Run tests'
-map global cargo c ':cargo clippy --all-targets<ret>' \
-	-docstring 'Run diagnostics'
-map global cargo b ':b *cargo*<ret>' \
-	-docstring 'Open cargo buffer'

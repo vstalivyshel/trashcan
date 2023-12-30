@@ -8,53 +8,6 @@ decl str toolsclient
 decl str jumpclient
 decl -hidden int find_current_line 0
 
-def -params ..1 -docstring "
-find [<pattern>]: search for a pattern in all buffers
-If <pattern> is not specified, the content of the main selection is used
-" find %{
-    try %{
-        eval %sh{ [ -z "$1" ] && echo fail }
-        reg / %arg{1}
-    } catch %{
-        exec -save-regs '' '*'
-    }
-    eval -draft -save-regs '"' %{
-        try %{ delete-buffer *find* }
-        # debug so that it's not included in the iteration
-        edit -scratch -debug *find-tmp*
-        eval -no-hooks -buffer * %{
-            try %{
-                exec '%s<ret>'
-                # merge selections that are on the same line
-                exec '<a-s><a-L><a-;>;'
-                eval -save-regs 'c"' -itersel %{
-                    reg c "%val{bufname}:%val{cursor_line}:%val{cursor_column}:"
-                    # expand to full line and yank
-                    exec -save-regs '' '<semicolon>xHy'
-                    # paste context followed by the selection
-                    # older Kakoune doesn't select pasted text so make sure we
-                    # to move the cursor to the end of the pasted text after P
-                    exec -buffer *find-tmp* 'geo<esc>"cPhglp'
-                }
-            }
-        }
-        exec -save-regs '' 'd%y'
-        delete-buffer *find-tmp*
-        edit -scratch *find*
-        exec R
-        set buffer find_current_line 0
-        addhl buffer/ regex "%reg{/}" 0:bright-white,blue
-        # final so that %reg{/} doesn't get highlighted in the header
-        addhl buffer/ regex "^([^\n]+):(\d+):(\d+):" 1:cyan,default+F 2:green,default+F 3:green,default+F
-        addhl buffer/ line '%opt{find_current_line}' default+b
-        map buffer normal <ret> :find-jump<ret>
-    }
-    eval -try-client %opt{toolsclient} %{
-        buffer *find*
-    }
-}
-
-
 def -hidden find-apply-impl -params 4 %{
     eval -buffer %arg{1} %{
         try %{
@@ -116,33 +69,4 @@ If -force is specified, changes will also be applied to files that do not curren
             [ $f -gt 0 ] && printf ", %i failed" "$f"
         }
     }
-}
-
-def -hidden find-jump %{
-    eval %{
-        try %{
-            exec -save-regs '' '<semicolon>xs^([^\n]+):(\d+):(\d+):<ret>'
-            set buffer find_current_line %val{cursor_line}
-            eval -try-client %opt{jumpclient} -verbatim -- edit -existing %reg{1} %reg{2} %reg{3}
-            try %{ focus %opt{jumpclient} }
-        }
-    }
-}
-
-def find-next-match -docstring 'Jump to the next find match' %{
-    eval -try-client %opt{jumpclient} %{
-        buffer '*find*'
-        exec "%opt{find_current_line}ggl/^[^\n]+:\d+:\d+:<ret>"
-        find-jump
-    }
-    try %{ eval -client %opt{toolsclient} %{ exec %opt{find_current_line}g } }
-}
-
-def find-previous-match -docstring 'Jump to the previous find match' %{
-    eval -try-client %opt{jumpclient} %{
-        buffer '*find*'
-        exec "%opt{find_current_line}g<a-/>^[^\n]+:\d+:\d+:<ret>"
-        find-jump
-    }
-    try %{ eval -client %opt{toolsclient} %{ exec %opt{find_current_line}g } }
 }
