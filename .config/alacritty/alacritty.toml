@@ -1,0 +1,13 @@
+import = ["/home/vstalivyshel/.config/alacritty/rose-pine-moon.toml"]
+
+[font]
+size = 9.0
+
+[font.bold]
+family = "JetBrainsMono NF"
+
+[font.italic]
+family = "JetBrainsMono NF"
+
+[font.normal]
+family = "JetBrainsMono NF"
