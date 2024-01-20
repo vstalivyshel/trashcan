@@ -1,4 +1,4 @@
-colorscheme lotus
+colorscheme rose-pine-moon
 #------------------------------------------------------------------------------
 # Plugins ---------------------------------------------------------------------
 source "%val{config}/cargo.kak"
@@ -404,7 +404,8 @@ set-option global modelinefmt \
 {{context_info}} {{mode_info}} - %val{client}@[%val{session}]
 - AS:%opt{auto_save_enabled}
 - ET:%opt{expand_tab_enabled}
-- (%opt{current_langmap})'
+- (%opt{current_langmap})
+- branch:(%sh{git branch --show-current || echo ""})'
 
 def toggle-langmap \
 -override \

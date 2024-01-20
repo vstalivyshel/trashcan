@@ -13,13 +13,12 @@ selected_theme=$(printf "$choices" | fzf)
 
 kakoune="$HOME/.config/kak/kakrc"
 ala_path="$HOME/.config/alacritty"
-ala="$ala_path/alacritty.yml"
+ala="$ala_path/alacritty.toml"
 
 for s in $(kak -l); do
 	printf %s "colorscheme $selected_theme" | kak -p "$s"
 done
 
-[[ -f "$ala" ]] && sed -i "s#- /.*#- $ala_path/$selected_theme.yml#" "$ala"
-
+[[ -f "$ala" ]] && sed -i "s#^import.*#import = [\"$ala_path/$selected_theme.toml\"]#" "$ala"
 [[ -f "$kakoune" ]] && sed -i "s/^colorscheme.*/colorscheme $selected_theme/" "$kakoune"
 
