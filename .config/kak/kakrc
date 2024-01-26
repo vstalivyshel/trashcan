@@ -98,7 +98,11 @@ eval %sh{
     if [ $file != "lua" ]; then
         printf %s "fail you are not in a lua theme file!"
     else
-        "$kak_config/maketheme" "$kak_buffile" "$kak_config/colors"
+        exe="luajit"
+        if ! type "$exe" &>/dev/null; then
+            exe="lua"
+        fi
+        $exe "$kak_config/maketheme" "$kak_buffile" "$kak_config/colors"
     fi 
 } }
 map global user M ':make-theme-current-file<ret>' \
@@ -405,7 +409,7 @@ set-option global modelinefmt \
 - AS:%opt{auto_save_enabled}
 - ET:%opt{expand_tab_enabled}
 - (%opt{current_langmap})
-- branch:(%sh{git branch --show-current || echo ""})'
+- branch:(%sh{git branch --show-current 2> /dev/null})'
 
 def toggle-langmap \
 -override \

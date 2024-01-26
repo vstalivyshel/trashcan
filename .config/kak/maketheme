@@ -1,5 +1,3 @@
-#!/usr/bin/env lua
-
 local io = io
 local os = os
 local arg = arg
