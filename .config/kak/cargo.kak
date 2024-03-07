@@ -35,8 +35,8 @@ add-highlighter shared/cargo/items/warning/context/pointer regex "\s(-+|\^+)\s" 
 add-highlighter shared/cargo/items/warning/context/share ref cargo-share
 
 # finished message
-add-highlighter shared/cargo/items/finished region "^\s+Finished dev" $ group
-add-highlighter shared/cargo/items/finished/finished regex "Finished dev" 0:green+b
+add-highlighter shared/cargo/items/finished region "^\s+Finished `dev`" $ group
+add-highlighter shared/cargo/items/finished/finished regex "Finished `dev`" 0:green+b
 add-highlighter shared/cargo/items/finished/flags regions
 add-highlighter shared/cargo/items/finished/flags/flags region \[ \] group
 add-highlighter shared/cargo/items/finished/flags/flags/flag regex '[a-zA-Z0-9_\-]+' 0:cyan

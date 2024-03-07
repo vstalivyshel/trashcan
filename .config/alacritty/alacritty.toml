@@ -11,3 +11,7 @@ family = "JetBrainsMono NF"
 
 [font.normal]
 family = "JetBrainsMono NF"
+
+[mouse]
+hide_when_typing = true
+

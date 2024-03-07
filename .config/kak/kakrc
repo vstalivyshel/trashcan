@@ -38,7 +38,11 @@ hook global BufOpenFile .*\.wgsl %{
 }
 hook global BufSetOption filetype=grep %{
     set buffer auto_save_enabled false
-    map buffer user W ':find-apply-changes -force<ret>' 
+    map buffer user W ':find-apply-changes -force; wa<ret>' 
+}
+hook global BufSetOption filetype=gdscript %{
+    set buffer expand_tab_enabled false
+    set buffer indentwidth 0
 }
 hook global BufCreate git %{
     set buffer auto_save_enabled false
@@ -87,8 +91,8 @@ evaluate-commands %sh{
     cmd=""
     for k in $keys; do
         cmd+="map global insert <a-$k> '<esc>$k' ; "
-	done
-	printf %s "eval %{ $cmd }"
+    done
+    printf %s "eval %{ $cmd }"
 }
 #------------------------------------------------------------------------------
 # themes ----------------------------------------------------------------------
@@ -135,14 +139,14 @@ def repl-send-prompt \
 -params ..1 \
 %{ prompt 'repl-cmd ' %{ repl-eval-text %val{text}} }
 map global user r ':repl-send-prompt<ret>' \
-	-docstring 'Prompt for command to send to repl'
+    -docstring 'Prompt for command to send to repl'
 
 def repl-eval-last-command \
 -override \
 -docstring "repl-eval-last-command: Re-run the last executed command at the REPL" \
  %{ nop %sh{tmux send -t $kak_opt_tmux_repl_id "Up" C-m} }
  map global user <a-r> ':repl-eval-last-command<ret>' \
- 	-docstring 'Repeat last sent command to repl'
+    -docstring 'Repeat last sent command to repl'
 # ------------------------------------------------------------------------------
 # splits ----------------------------------------------------------------------
 
@@ -176,7 +180,7 @@ map global window-mode t ":buf-tab<ret>" \
     -docstring 'Open current buffer in new tab'
 
 map global window-mode q ":q<ret>" \
-	-docstring 'Close current window'
+    -docstring 'Close current window'
 #------------------------------------------------------------------------------
 # little helper----------------------------------------------------------------
 alias global d delete-buffer
@@ -185,7 +189,7 @@ alias global d delete-buffer
 decl bool auto_save_enabled true
 hook global -group auto-save-manager BufSetOption auto_save_enabled=true %{
     hook -group auto-save buffer NormalKey '.*' %{
-        eval %sh{ [ $kak_modified == true ] && printf %s 'w'  }
+        eval %sh{ [ $kak_modified == true ] && printf %s "w" }
     }
 }
 hook global -once -group auto-save-manager BufSetOption auto_save_enabled=false %{
@@ -197,14 +201,10 @@ hook global -once -group auto-save-manager BufSetOption auto_save_enabled=false 
 # Expand-tab
 decl bool expand_tab_enabled true
 hook global -group expand-tab-manager BufSetOption expand_tab_enabled=true %{
-    hook -group expand-tab buffer NormalKey '.*' %{
-		hook buffer -group expand-tab InsertKey <tab> %{ exec -draft h@ }
-    }
+    hook -group expand-tab buffer InsertKey <tab> %{ exec -draft h@ }
 }
 hook global -once -group expand-tab-manager BufSetOption expand_tab_enabled=false %{
-    hook -group expand-tab buffer NormalKey '.*' %{
-        rmhooks buffer expand-tab
-    }
+    hook -group expand-tab buffer NormalKey '.*' %{ rmhooks buffer expand-tab }
 }
 
 def pipe \
@@ -293,17 +293,17 @@ eval %sh{
     [ -n "$1" ] && spc=" "
     o="$kak_key"
     c="$kak_key"
-	case "$o" in
-    	"<esc>") exit 0 ;;
+    case "$o" in
+        "<esc>") exit 0 ;;
         "<lt>" | "<gt>") o="<" c=">" ;;
         "(" | ")") o="(" c=")" ;;
-    	"[" | "]") o="[" c="]" ;;
-    	"{") c="}" ;;
-	esac
-	o="$o$spc"
-	c="$spc$c"
-	printf %s "set-register c %¶$c¶ ;
-        	   set-register o %¶$o¶ ;"
+        "[" | "]") o="[" c="]" ;;
+        "{") c="}" ;;
+    esac
+    o="$o$spc"
+    c="$spc$c"
+    printf %s "set-register c %¶$c¶ ;
+               set-register o %¶$o¶ ;"
 }
 exec -draft -itersel '"mZ"oP"mz"cp"mz'
 } } }
@@ -354,7 +354,9 @@ map global user b ':find-buffer<ret>' \
 def ls \
 -docstring 'List files in the current directory' \
 -override \
-%{ info -title "%val{buffile}" %sh{ ls -Alh } }
+-file-completion \
+-params ..1 \
+%{ info -title "%val{buffile}" %sh{ ls -Alh $1} }
 map global normal <c-l> ":ls<ret>"
 
 def sh \
@@ -418,7 +420,7 @@ def toggle-langmap \
     RU="ёЁ1!2\"3№4;5%6:7?8*9(0)_=+\\|йЙцЦуУкКеЕнНгГшШщЩзЗхХъЪфФыЫвВаАпПрРоОлЛдДжЖэЭяЯчЧсСмМиИтТьЬбБюЮ.,"
     UA="'ʼ1!2\"3№4;5%6:7?8*9(0)_=+ґҐйЙцЦуУкКеЕнНгГшШщЩзЗхХїЇфФіІвВаАпПрРоОлЛдДжЖєЄяЯчЧсСмМиИтТьЬбБюЮ.,"
 
-	NEW_CURRENT="en"
+    NEW_CURRENT="en"
     DEFAULT_MAP="$EN"
     ALT_MAP="$UA"
     [ $kak_opt_alt_langmap == "ru" ] && ALT_MAP="$RU" 
@@ -440,18 +442,18 @@ map global normal '<c-^>' '<a-;>:toggle-langmap<ret>'
 declare-user-mode cargo
 
 map global user n ':cargo-next-error<ret>' \
-	-docstring 'Next "cargo" error/warning'
+    -docstring 'Next "cargo" error/warning'
 map global user p ':cargo-previous-error<ret>' \
-	-docstring 'Previous "cargo" error/warning'
+    -docstring 'Previous "cargo" error/warning'
 map global user c ':enter-user-mode cargo<ret>' \
-	-docstring 'Cargo mode'
+    -docstring 'Cargo mode'
 
 map global cargo t ':cargo test<ret>' \
-	-docstring 'Run tests'
+    -docstring 'Run tests'
 map global cargo c ':cargo clippy --all-targets<ret>' \
-	-docstring 'Run diagnostics'
+    -docstring 'Run diagnostics'
 map global cargo b ':b *cargo*<ret>' \
-	-docstring 'Open cargo buffer'
+    -docstring 'Open cargo buffer'
 map global cargo f ':sh cargo fmt<ret>' \
     -docstring 'Format cargo project'
 #------------------------------------------------------------------------------

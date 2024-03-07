@@ -33,7 +33,7 @@ return {
     InsertCursor           = {base, rose, "+b"},
     PrimarySelection       = {default,overlay, "+g"},
     SecondarySelection     = {default, highlight_med, "+g"},
-    PrimaryCursor          = {base,rose, "+g"},
+    PrimaryCursor          = {base,foam, "+g"},
     SecondaryCursor        = {text,highlight_high, "+g"},
     PrimaryCursorEol       = "PrimaryCursor",
     SecondaryCursorEol     = "SecondaryCursor",
